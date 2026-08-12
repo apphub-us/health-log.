@@ -305,6 +305,21 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 #goal-editor{background:var(--card);border:1px solid var(--line);
   border-top:none;border-radius:0 0 var(--r) var(--r);padding:14px;margin-top:-7px}
 #goal-editor .btn{margin-top:12px}
+
+.rcomp{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:11px 12px;margin-bottom:7px}
+.rline{display:flex;align-items:center;gap:8px;margin-top:8px}
+.rkcal{font:600 12px var(--mono);color:var(--deep);margin-left:auto}
+#rec-components{margin:10px 0}
+.rtot{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:13px;margin-top:10px}
+.rrow{display:flex;justify-content:space-between;align-items:baseline;
+  padding:5px 0;font-size:13.5px}
+.rrow+.rrow{border-top:1px solid var(--line)}
+.rbadge{display:inline-block;background:var(--deep2);color:#fff;border-radius:3px;
+  font:600 9.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;
+  padding:3px 6px;margin-left:8px;vertical-align:middle}
+#rec-summary .ptags{margin-top:10px}
 </style>
 </head>
 <body>
@@ -399,6 +414,7 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
     <button class="mtab on" data-fmethod="barcode">Barcode</button>
     <button class="mtab" data-fmethod="photo">Label photo</button>
     <button class="mtab" data-fmethod="manual">By hand</button>
+    <button class="mtab" data-fmethod="recipe">Recipe</button>
   </div>
 
   <div id="fm-barcode" class="fmethod on">
@@ -418,6 +434,27 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
     <input type="file" id="label-input" accept="image/*">
     <p class="disclaim">Reads the ingredient list and the per-serving numbers in one go.
     Needs the Worker URL set in Settings.</p>
+  </div>
+
+  <div id="fm-recipe" class="fmethod">
+    <p class="disclaim">Build something out of foods you already have — a shake, a bowl, a sandwich.
+    Save it once and log it by name after that. The app still tracks every component underneath,
+    so if one ingredient is the problem you can still find it.</p>
+  </div>
+
+  <div id="recipe-pane" style="display:none">
+    <label for="rec-name">Recipe name</label>
+    <input type="text" id="rec-name" placeholder="e.g. protein shake">
+
+    <label for="rec-makes">Makes how many servings</label>
+    <input type="number" id="rec-makes" step="0.5" min="0.5" value="1">
+
+    <label for="rec-input">Add what goes in it</label>
+    <input type="text" id="rec-input" placeholder="Search your foods" autocomplete="off">
+    <div id="rec-suggest"></div>
+    <div id="rec-components"></div>
+    <div id="rec-summary"></div>
+    <button class="btn" data-act="saveRecipe">Save recipe</button>
   </div>
 
   <div id="fm-manual" class="fmethod">
@@ -1107,18 +1144,71 @@ function tagIngredients(ingredients){
   return Object.keys(found);
 }
 
-/* A meal item may be a plain food or a saved product.
-   Products expand into: the product itself + its tags.
-   The product stays testable on its own so you can find
-   "this specific bar" even when no single tag explains it. */
+/* A meal item may be a plain food, a saved product, or a recipe.
+   Everything expands into three testable levels:
+
+     recipe -> its own name
+            -> each component food
+            -> the ingredient groups of those components
+
+   This matters: if you log "protein shake" as one opaque blob and
+   the banana inside is the problem, the analysis can only ever
+   blame the shake. Expanding the components keeps the culprit
+   findable while you still type one word. */
 function expandMealItems(items, products){
   var out = {};
-  (items||[]).forEach(function(it){
-    out[it] = true;
-    var p = products[it];
-    if(p && p.tags) p.tags.forEach(function(tg){ out['#'+tg] = true; });
-  });
+
+  function addProduct(name, depth){
+    if(out[name] && depth>0) return;
+    out[name] = true;
+    var p = products[name];
+    if(!p) return;
+    (p.tags||[]).forEach(function(tg){ out['#'+tg] = true; });
+    if(p.components && depth < 3){
+      p.components.forEach(function(c){ addProduct(c.item, depth+1); });
+    }
+  }
+
+  (items||[]).forEach(function(it){ addProduct(it, 0); });
   return Object.keys(out);
+}
+
+/* Nutrition of a recipe = sum of its components, divided by how
+   many servings it makes. A component without nutrition data
+   contributes nothing and is reported as missing, so a recipe
+   never quietly under-reports. */
+function recipeNutrition(components, products, makes){
+  makes = makes && makes > 0 ? makes : 1;
+  var tot = {}, missing = [];
+  NUTRIENTS.forEach(function(n){ tot[n.key] = 0; });
+  var any = false;
+
+  (components||[]).forEach(function(c){
+    var p = products[c.item];
+    if(!p || !p.nutrition || p.nutrition.kcal == null){ missing.push(c.item); return; }
+    any = true;
+    NUTRIENTS.forEach(function(n){
+      var v = p.nutrition[n.key];
+      if(typeof v === 'number') tot[n.key] += v * (c.portion || 1);
+    });
+  });
+
+  if(!any) return { nutrition: null, missing: missing };
+  NUTRIENTS.forEach(function(n){
+    tot[n.key] = Math.round((tot[n.key] / makes) * 10) / 10;
+  });
+  tot.kcal = Math.round(tot.kcal);
+  return { nutrition: tot, missing: missing };
+}
+
+/* Union of the ingredient groups of every component. */
+function recipeTags(components, products){
+  var t = {};
+  (components||[]).forEach(function(c){
+    var p = products[c.item];
+    if(p && p.tags) p.tags.forEach(function(tg){ t[tg] = true; });
+  });
+  return Object.keys(t);
 }
 
 function expandMeals(meals, products){
@@ -2284,13 +2374,18 @@ function renderFood(){
 }
 
 function setFoodMethod(m){
-  ['barcode','photo','manual'].forEach(function(k){
+  ['barcode','photo','manual','recipe'].forEach(function(k){
     var pane = el('fm-'+k);
     if(pane) pane.classList.toggle('on', k===m);
   });
   var tabs = document.querySelectorAll('.mtab');
   for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on', tabs[i].dataset.fmethod===m);
   el('prod-step').textContent='';
+  var common = el('prod-common');
+  if(common) common.style.display = (m==='recipe') ? 'none' : 'block';
+  var rp = el('recipe-pane');
+  if(rp) rp.style.display = (m==='recipe') ? 'block' : 'none';
+  if(m==='recipe') renderRecipe();
 }
 
 /* ---------- LOG: MEAL ---------- */
@@ -2829,8 +2924,12 @@ var prodDraft = { name:'', ingredients:[], tags:[], nutrition:null, servingLabel
 function renderProducts(){
   el('prod-list').innerHTML = STATE.products.length
     ? STATE.products.map(function(p){
-        return '<div class="prodcard"><div class="srow"><span class="sname">'+esc(p.name)+'</span>'+
-          '<button class="mini danger" data-delprod="'+p.id+'">Delete</button></div>'+
+        var isRec = !!p.components;
+        return '<div class="prodcard"><div class="srow"><span class="sname">'+esc(p.name)+
+          (isRec?'<span class="rbadge">recipe</span>':'')+'</span>'+
+          '<span>'+(isRec?'<button class="mini" data-editrec="'+p.id+'">Edit</button> ':'')+
+          '<button class="mini danger" data-delprod="'+p.id+'">Delete</button></span></div>'+
+          (isRec?'<div class="msub">'+p.components.map(function(c){return esc(c.item);}).join(' · ')+'</div>':'')+
           '<div class="ptags">'+p.tags.map(function(tg){
             return '<span class="ptag">'+esc(TAGS[tg]?TAGS[tg].label:tg)+'</span>';
           }).join('')+'</div>'+
@@ -2839,7 +2938,7 @@ function renderProducts(){
               ' · C '+(p.nutrition.carbs||0)+' · F '+(p.nutrition.fat||0)+
               '<span class="msub"> per '+esc(p.servingLabel||'serving')+'</span></div>'
             : '<div class="msub">No nutrition data</div>')+
-          '<div class="msub">'+p.ingredients.length+' ingredients</div></div>';
+          (isRec?'':'<div class="msub">'+p.ingredients.length+' ingredients</div>')+'</div>';
       }).join('')
     : '<p class="muted">No packaged foods saved yet.</p>';
 }
@@ -2947,6 +3046,122 @@ function readLabelPhoto(file){
     }).catch(function(){ el('prod-step').textContent='Could not read it. Type it in.'; });
   };
   fr.readAsDataURL(file);
+}
+
+/* ---------- RECIPES ---------- */
+var recipeDraft = { components: [], makes: 1 };
+
+function renderRecipe(){
+  var pm = productMap();
+  var box = el('rec-components');
+
+  box.innerHTML = recipeDraft.components.length
+    ? recipeDraft.components.map(function(c,i){
+        var p = pm[c.item];
+        var kcal = (p && p.nutrition && p.nutrition.kcal!=null)
+          ? Math.round(p.nutrition.kcal*c.portion)+' kcal' : 'no data';
+        var serv = p && p.servingLabel ? p.servingLabel : 'serving';
+        return '<div class="rcomp">'+
+          '<div class="fhead"><span class="fname">'+esc(c.item)+'</span>'+
+          '<button class="frm" data-rmcomp="'+i+'">×</button></div>'+
+          '<div class="rline">'+
+            '<input class="portin" type="number" step="0.25" min="0" '+
+            'data-compport="'+i+'" value="'+c.portion+'">'+
+            '<span class="portlbl">× '+esc(serv)+'</span>'+
+            '<span class="rkcal">'+kcal+'</span></div></div>';
+      }).join('')
+    : '<p class="muted">No components yet. Add the things that go into it.</p>';
+
+  var r = recipeNutrition(recipeDraft.components, pm, recipeDraft.makes);
+  var tags = recipeTags(recipeDraft.components, pm);
+  var out = '';
+
+  if(r.nutrition){
+    out += '<div class="rtot"><div class="ckhead">Per serving</div>'+
+      NUTRIENTS.map(function(n){
+        return '<div class="rrow"><span>'+esc(n.label)+'</span>'+
+          '<span class="nval">'+r.nutrition[n.key]+'<em>'+esc(n.unit)+'</em></span></div>';
+      }).join('')+'</div>';
+  }
+  if(r.missing.length){
+    out += '<div class="nmiss">No nutrition data for: '+r.missing.map(esc).join(', ')+
+      '. These add nothing to the totals — set them up as foods first if you want accurate numbers.</div>';
+  }
+  if(tags.length){
+    out += '<div class="ptags">'+tags.map(function(tg){
+      return '<span class="ptag">'+esc(TAGS[tg]?TAGS[tg].label:tg)+'</span>';
+    }).join('')+'</div>';
+  }
+  el('rec-summary').innerHTML = out;
+
+  var sg = el('rec-suggest'); if(sg) sg.innerHTML='';
+}
+
+function renderRecipeSuggest(q){
+  q = (q||'').trim().toLowerCase();
+  var box = el('rec-suggest');
+  if(!q){ box.innerHTML=''; return; }
+  var used = recipeDraft.components.map(function(c){ return c.item; });
+  var hits = itemHistory().filter(function(h){
+    return h.item.indexOf(q)!==-1 && used.indexOf(h.item)===-1;
+  }).slice(0,6);
+  box.innerHTML = hits.map(function(h){
+    var pm = productMap(), p = pm[h.item];
+    var badge = (p && p.nutrition && p.nutrition.kcal!=null) ? p.nutrition.kcal+' kcal' : 'no data';
+    return '<button class="sugg" data-addcomp="'+esc(h.item)+'">'+esc(h.item)+
+           '<span class="suggn">'+badge+'</span></button>';
+  }).join('');
+}
+
+function addComponent(name){
+  name = (name||'').trim().toLowerCase();
+  if(!name) return;
+  if(recipeDraft.components.some(function(c){ return c.item===name; })) return;
+  recipeDraft.components.push({ item:name, portion:1 });
+  el('rec-input').value='';
+  renderRecipe();
+}
+
+function saveRecipe(){
+  var name = (el('rec-name').value||'').trim().toLowerCase();
+  if(!name){ toast('Give it a name'); return; }
+  if(!recipeDraft.components.length){ toast('Add at least one component'); return; }
+
+  var pm = productMap();
+  var makes = parseFloat(el('rec-makes').value) || 1;
+  var r = recipeNutrition(recipeDraft.components, pm, makes);
+
+  var rec = {
+    id: uid('rc'), name:name, kind:'recipe',
+    components: recipeDraft.components.slice(),
+    makes: makes,
+    servingLabel: makes>1 ? ('1 of '+makes+' servings') : '1 serving',
+    tags: recipeTags(recipeDraft.components, pm),
+    ingredients: [],
+    nutrition: r.nutrition,
+    at: new Date().toISOString()
+  };
+
+  dbPut('products', rec, function(){
+    STATE.products.push(rec);
+    recipeDraft = { components: [], makes: 1 };
+    el('rec-name').value=''; el('rec-makes').value='1';
+    if(mealDraft.indexOf(name)===-1) mealDraft.push(name);
+    renderFood(); renderRecipe();
+    var a = el('meal-chips'); if(a && a.scrollIntoView) a.scrollIntoView({block:'center'});
+    toast('Recipe saved. Next time just type its name.');
+  });
+}
+
+function editRecipe(id){
+  var r = STATE.products.filter(function(p){ return p.id===id; })[0];
+  if(!r || !r.components) return;
+  recipeDraft = { components: r.components.slice(), makes: r.makes||1 };
+  el('rec-name').value = r.name;
+  el('rec-makes').value = r.makes||1;
+  setFoodMethod('recipe');
+  renderRecipe();
+  toast('Loaded. Saving will create an updated copy.');
 }
 
 /* --- Open Food Facts lookup --- */
@@ -3232,7 +3447,7 @@ function toast(msg){
 
 /* ---------- EVENT DELEGATION (no inline onclick — Safari) ---------- */
 document.addEventListener('click', function(e){
-  var t = e.target.closest ? e.target.closest('[data-go],[data-bris],[data-opt],[data-addchip],[data-rmchip],[data-stop],[data-delsupp],[data-unit],[data-delprod],[data-rmtag],[data-setport],[data-fmethod],[data-act]') : null;
+  var t = e.target.closest ? e.target.closest('[data-go],[data-bris],[data-opt],[data-addchip],[data-rmchip],[data-stop],[data-delsupp],[data-unit],[data-delprod],[data-rmtag],[data-setport],[data-fmethod],[data-addcomp],[data-rmcomp],[data-editrec],[data-act]') : null;
   if(!t) return;
   var d = t.dataset;
   if(d.go) go(d.go);
@@ -3240,6 +3455,9 @@ document.addEventListener('click', function(e){
   else if(d.opt){ stoolDraft[d.opt] = d.opt==='color' ? d.val : parseInt(d.val,10); renderLog(); }
   else if(d.delprod){ dbDel('products',d.delprod,function(){
       STATE.products = STATE.products.filter(function(p){return p.id!==d.delprod;}); renderProducts(); }); }
+  else if(d.addcomp) addComponent(d.addcomp);
+  else if(d.rmcomp){ recipeDraft.components.splice(parseInt(d.rmcomp,10),1); renderRecipe(); }
+  else if(d.editrec) editRecipe(d.editrec);
   else if(d.setport){ var sp=d.setport.split('|'); setPortion(sp[0], parseFloat(sp[1])); }
   else if(d.fmethod){ setFoodMethod(d.fmethod); }
   else if(d.rmtag){ prodDraft.tags = prodDraft.tags.filter(function(x){return x!==d.rmtag;}); showProdPreview(); }
@@ -3251,7 +3469,7 @@ document.addEventListener('click', function(e){
   else if(d.delsupp){ dbDel('supps',d.delsupp,function(){ STATE.supps = STATE.supps.filter(function(s){return s.id!==d.delsupp;}); renderSupps(); }); }
   else if(d.act){
     var m = { saveStool:saveStool, saveMeal:saveMeal, saveMetric:saveMetric, addCustom:addCustomMetric,
-      saveLab:saveLab, addSupp:addSupp, addCustomSupp:addCustomSupp, parseProd:parseProductText, saveProd:saveProduct, lookup:function(){ lookupBarcode(el('prod-barcode').value); }, saveGoals:saveGoals, toggleGoals:toggleGoals, saveSettings:saveSettings, export:doExport,
+      saveLab:saveLab, addSupp:addSupp, addCustomSupp:addCustomSupp, parseProd:parseProductText, saveProd:saveProduct, lookup:function(){ lookupBarcode(el('prod-barcode').value); }, saveGoals:saveGoals, toggleGoals:toggleGoals, saveRecipe:saveRecipe, saveSettings:saveSettings, export:doExport,
       extract:extractFromPhoto, saveEx:saveExtracted, send:sendChat, resetMask:resetMask, back:function(){ go('hub'); } };
     m[d.act] && m[d.act]();
   }
@@ -3284,10 +3502,23 @@ function boot(){
   el('chk-pain').addEventListener('change', function(){ stoolDraft.painWakesAtNight=this.checked; checkFlags(); });
   el('photo-input').addEventListener('change', function(){ if(this.files[0]) loadLabPhoto(this.files[0]); });
   el('label-input').addEventListener('change', function(){ if(this.files[0]) readLabelPhoto(this.files[0]); });
+  el('rec-input').addEventListener('input', function(){ renderRecipeSuggest(this.value); });
+  el('rec-input').addEventListener('keydown', function(e){
+    if(e.key==='Enter'){ e.preventDefault(); addComponent(this.value); } });
+  el('rec-makes').addEventListener('input', function(){
+    recipeDraft.makes = parseFloat(this.value)||1; renderRecipe(); });
   el('barcode-input').addEventListener('change', function(){ if(this.files[0]) scanBarcode(this.files[0]); });
   el('prod-barcode').addEventListener('keydown', function(e){
     if(e.key==='Enter'){ e.preventDefault(); lookupBarcode(this.value); } });
   document.addEventListener('input', function(e){
+    var cp = e.target.dataset && e.target.dataset.compport;
+    if(cp !== undefined){
+      var v2 = parseFloat(e.target.value);
+      recipeDraft.components[parseInt(cp,10)].portion = (isNaN(v2)||v2<=0) ? 1 : v2;
+      clearTimeout(window.__recT);
+      window.__recT = setTimeout(renderRecipe, 500);
+      return;
+    }
     var p = e.target.dataset && e.target.dataset.port;
     if(!p) return;
     var v = parseFloat(e.target.value);
