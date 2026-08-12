@@ -224,6 +224,54 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--deep);
 .cklist ul{margin:0;padding-left:17px}
 .cklist li{font-size:13px;line-height:1.55;color:var(--ink)}
 .two .btn{margin-top:14px}
+
+#meal-suggest{display:grid;gap:3px;margin:6px 0}
+.sugg{display:flex;justify-content:space-between;align-items:center;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:9px 12px;font-size:14.5px;cursor:pointer;text-align:left;width:100%}
+.sugg:hover,.sugg:focus-visible{border-color:var(--deep);background:#fff}
+.sugg b{color:var(--deep);font-weight:700}
+.suggn{font:400 11px var(--mono);color:var(--ink2);flex:none;margin-left:10px}
+#unit-toggle{margin-top:8px}
+.scustom{font-size:12px;color:var(--ink2);margin-top:7px;
+  padding-left:9px;border-left:2px solid var(--line);font-style:italic}
+
+.prodcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:13px;margin-bottom:9px}
+.ptags{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 4px}
+.ptag{display:inline-block;background:#E4EDF6;border:1px solid var(--line);
+  border-radius:20px;padding:4px 10px;font-size:12px;color:var(--deep)}
+button.ptag{cursor:pointer}
+button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
+.cand.istag{border-left:3px solid var(--deep2)}
+.ckind{font:500 10px/1 var(--mono);letter-spacing:.11em;text-transform:uppercase;
+  color:var(--ink2);margin-top:5px}
+.cwhy{font-size:12.5px;line-height:1.5;color:var(--ink2);margin-top:7px}
+#prod-preview:empty{display:none}
+
+/* --- daily macros --- */
+#daily-totals{background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r);padding:14px;margin-bottom:6px}
+.dayhead{font:500 11px/1 var(--mono);letter-spacing:.1em;color:var(--ink2);margin-bottom:12px}
+.nrow{margin-bottom:11px}
+.nhead{display:flex;justify-content:space-between;align-items:baseline}
+.nlab{font-size:13.5px;font-weight:500}
+.nval{font:600 15px var(--mono);font-variant-numeric:tabular-nums}
+.nval em{font-size:10.5px;font-style:normal;color:var(--ink2);font-weight:400;margin-left:2px}
+.ngoal{font-size:12px;color:var(--ink2);font-weight:400}
+.nbar{height:5px;background:#DCE5EF;border-radius:3px;overflow:hidden;margin-top:5px}
+.nfill{height:100%;background:var(--deep2);transition:width .25s}
+.nfill.over{background:var(--signal)}
+.nmiss{font-size:12px;line-height:1.5;color:var(--ink2);margin-top:12px;
+  padding-left:9px;border-left:2px solid var(--line)}
+/* --- portions --- */
+.chiprow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;width:100%}
+.portwrap{display:flex;align-items:center;gap:6px}
+.portin{width:64px;height:32px;font-size:13.5px;padding:4px 7px;text-align:center}
+.portlbl{font-size:12px;color:var(--ink2)}
+.portkcal{font:600 12px var(--mono);color:var(--deep)}
+.pnut{font:500 13px var(--mono);color:var(--deep);margin-top:6px}
+#meal-chips{display:block}
 </style>
 </head>
 <body>
@@ -258,6 +306,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--deep);
   </div>
   <div class="minor">
     <button data-go="labs">Blood work</button>
+    <button data-go="products">Packaged foods</button>
     <button data-go="supps">Supplements</button>
     <button data-go="settings">Settings</button>
   </div>
@@ -284,8 +333,12 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--deep);
   <textarea id="stool-note" placeholder="bloating, smell, floated..."></textarea>
   <button class="btn" data-act="saveStool">Save stool</button>
 
+  <h3>Today</h3>
+  <div id="daily-totals"></div>
+
   <h3>Meal</h3>
-  <input type="text" id="meal-input" placeholder="Type an item and press Enter">
+  <input type="text" id="meal-input" placeholder="Type an item and press Enter" autocomplete="off">
+  <div id="meal-suggest"></div>
   <div id="meal-chips"></div>
   <div class="pills" id="meal-recent"></div>
   <label for="meal-time">When</label>
@@ -298,6 +351,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--deep);
     <select id="metric-select"></select>
     <input type="number" step="0.1" id="metric-value" placeholder="value">
   </div>
+  <div class="pills" id="unit-toggle"></div>
   <input type="datetime-local" id="metric-time">
   <button class="btn ghost" data-act="saveMetric">Save measurement</button>
   <button class="mini" data-act="addCustom" style="margin-top:10px">+ custom measurement</button>
@@ -364,6 +418,57 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--deep);
   <div id="lab-list"></div>
 </section>
 
+<!-- PACKAGED FOODS -->
+<section id="s-products" class="screen">
+  <h2>Packaged foods</h2>
+  <p class="sub">Save a bar or ready meal once, with its ingredient list. After that you log it
+  by name and the app tracks its ingredient groups underneath.</p>
+
+  <label for="prod-name">Name you will type when logging</label>
+  <input type="text" id="prod-name" placeholder="e.g. quest bar chocolate">
+
+  <h3>Barcode</h3>
+  <div class="two">
+    <input type="text" id="prod-barcode" inputmode="numeric" placeholder="type the number">
+    <button class="btn ghost" data-act="lookup" style="margin-top:0">Look up</button>
+  </div>
+  <label for="barcode-input">Or photo of the barcode</label>
+  <input type="file" id="barcode-input" accept="image/*">
+  <p class="disclaim">Looks the product up in Open Food Facts, a community database.
+  Entries are contributed by users and are sometimes wrong or missing — always check
+  the numbers against the package.</p>
+
+  <h3>Label</h3>
+  <label for="label-input">Photo of the nutrition label</label>
+  <input type="file" id="label-input" accept="image/*">
+  <p id="prod-step" class="disclaim"></p>
+
+  <label for="prod-serving">Serving size as printed</label>
+  <input type="text" id="prod-serving" placeholder="1 bar (60 g)">
+
+  <label>Per serving</label>
+  <div class="four">
+    <input type="number" step="any" id="nut-kcal" placeholder="kcal">
+    <input type="number" step="any" id="nut-protein" placeholder="protein">
+    <input type="number" step="any" id="nut-carbs" placeholder="carbs">
+    <input type="number" step="any" id="nut-fat" placeholder="fat">
+  </div>
+  <div class="two" style="margin-top:6px">
+    <input type="number" step="any" id="nut-fiber" placeholder="fiber">
+    <input type="number" step="any" id="nut-sugars" placeholder="sugars">
+  </div>
+
+  <label for="prod-ingredients">Ingredient text</label>
+  <textarea id="prod-ingredients" placeholder="Ingredients: milk protein isolate, soluble corn fiber, almonds..."></textarea>
+  <button class="btn ghost" data-act="parseProd">Read ingredients</button>
+
+  <div id="prod-preview" class="cklist" style="margin-top:14px"></div>
+  <button class="btn" data-act="saveProd" id="prod-save" style="display:none">Save product</button>
+
+  <h3>Saved</h3>
+  <div id="prod-list"></div>
+</section>
+
 <!-- SUPPLEMENTS -->
 <section id="s-supps" class="screen">
   <h2>Supplements</h2>
@@ -375,6 +480,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--deep);
     <div><label for="supp-start">Started</label><input type="date" id="supp-start"></div>
   </div>
   <button class="btn" data-act="addSupp">Add</button>
+  <button class="mini" data-act="addCustomSupp" style="margin-top:10px">+ supplement not on the list</button>
   <h3>Active</h3><div id="supp-active"></div>
   <h3>Stopped</h3><div id="supp-past"></div>
 </section>
@@ -409,6 +515,11 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--deep);
     <div><label for="set-sex">Sex</label><select id="set-sex"><option value="M">Male</option><option value="F">Female</option></select></div>
   </div>
   <button class="btn" data-act="saveSettings">Save</button>
+
+  <h3>Daily goals</h3>
+  <p class="muted">Leave a field blank to track the total without a target.</p>
+  <div id="goal-fields" class="two"></div>
+  <button class="btn ghost" data-act="saveGoals">Save goals</button>
 
   <h3>Backup</h3>
   <p class="muted">Your data lives only in this browser. Clearing site data deletes it.
@@ -817,6 +928,236 @@ var SUPPLEMENTS = {
     interferes: [{ analyte: 'urea', direction: 'up', threshold: 60, washoutHours: 48,
       why: 'High protein intake raises urea with no kidney pathology.' }] }
 };
+
+/* ---------------------------------------- */
+
+/* ============================================================
+   INGREDIENT TAGS
+
+   Why tags and not raw ingredients: a protein bar has 30+
+   ingredients. Testing all of them wrecks the permutation test —
+   the max-statistic threshold rises with every item tested, and
+   rare ingredients never reach the exposure minimum anyway.
+
+   Tags collapse 40 ingredients into ~6 groups that recur across
+   many foods, so each accumulates real exposure counts.
+
+   These are GI-relevant groupings, not allergens. The point is
+   to find what upsets your gut, not to diagnose an allergy.
+   ============================================================ */
+
+var TAGS = {
+  lactose: { label:'Lactose', why:'Common cause of gas, bloating and loose stool. Hard cheeses and butter contain very little.' },
+  dairy_protein: { label:'Dairy protein', why:'Separate from lactose — some people react to casein or whey rather than the sugar.' },
+  gluten: { label:'Gluten', why:'Wheat, barley, rye, malt.' },
+  fructans: { label:'Fructans', why:'FODMAP group. Wheat, onion, garlic, inulin, chicory root. Very common in protein bars.' },
+  gos: { label:'GOS', why:'FODMAP group. Beans, lentils, chickpeas, soy.' },
+  polyols: { label:'Sugar alcohols', why:'Maltitol, sorbitol, xylitol, erythritol. A leading cause of loose stool in protein and low-sugar bars. Dose-dependent.' },
+  excess_fructose: { label:'Excess fructose', why:'FODMAP group. Honey, HFCS, agave, apple, mango.' },
+  artificial_sweetener: { label:'Artificial sweeteners', why:'Sucralose, aspartame, acesulfame-K.' },
+  caffeine: { label:'Caffeine', why:'Speeds transit. Coffee also stimulates the gut independently of caffeine.' },
+  alcohol: { label:'Alcohol', why:'Irritant and transit accelerant.' },
+  capsaicin: { label:'Spicy / capsaicin', why:'Directly speeds transit in sensitive people.' },
+  high_fat: { label:'High fat', why:'Large fat loads trigger the gastrocolic reflex.' },
+  soluble_fiber: { label:'Soluble fiber', why:'Oats, psyllium, chia. Usually firms stool.' },
+  insoluble_fiber: { label:'Insoluble fiber', why:'Bran, raw vegetable skins. Usually speeds transit.' },
+  soy: { label:'Soy', why:'' },
+  egg: { label:'Egg', why:'' },
+  nuts: { label:'Tree nuts / peanuts', why:'' },
+  histamine: { label:'High histamine', why:'Aged cheese, cured meat, fermented foods, wine.' }
+};
+
+/* Keyword -> tags. Matched as substrings against lowercased
+   ingredient text, so 'whey protein isolate' hits 'whey'. */
+var INGREDIENT_TAGS = [
+  [['milk','whey','casein','cream','butter','yogurt','yoghurt','cheese','lactose','ghee','kefir'], ['dairy_protein']],
+  [['milk','cream','yogurt','yoghurt','lactose','condensed milk','milk powder','whey concentrate','milk solids'], ['lactose']],
+  [['wheat','barley','rye','malt','semolina','spelt','farro','couscous','seitan','graham'], ['gluten','fructans']],
+  [['onion','garlic','shallot','leek','inulin','chicory','jerusalem artichoke','agave inulin'], ['fructans']],
+  [['bean','lentil','chickpea','garbanzo','soy','edamame','pea protein','hummus'], ['gos']],
+  [['soy','soya','edamame','tofu','tempeh','soy lecithin','miso'], ['soy']],
+  [['maltitol','sorbitol','xylitol','erythritol','mannitol','isomalt','lactitol','polyol','sugar alcohol','glycerin','glycerol'], ['polyols']],
+  [['high fructose','hfcs','honey','agave','fruit juice concentrate','apple juice','mango','pear','watermelon'], ['excess_fructose']],
+  [['sucralose','aspartame','acesulfame','saccharin','neotame','splenda'], ['artificial_sweetener']],
+  [['coffee','espresso','caffeine','green tea','black tea','matcha','yerba','cola','energy drink','guarana'], ['caffeine']],
+  [['beer','wine','vodka','whiskey','whisky','rum','gin','tequila','alcohol','liqueur','cider'], ['alcohol']],
+  [['chili','chilli','jalapeno','habanero','cayenne','sriracha','hot sauce','capsaicin','pepper flakes','harissa','gochujang'], ['capsaicin']],
+  [['oat','oats','psyllium','chia','flax','acacia','soluble corn fiber','soluble tapioca fiber','beta glucan'], ['soluble_fiber']],
+  [['bran','wheat bran','whole grain','cellulose','pea fiber'], ['insoluble_fiber']],
+  [['almond','cashew','walnut','pecan','pistachio','hazelnut','macadamia','peanut','nut butter'], ['nuts']],
+  [['egg','albumen','egg white','egg powder'], ['egg']],
+  [['salami','prosciutto','pepperoni','aged cheese','parmesan','sauerkraut','kimchi','kombucha','vinegar','anchovy','cured'], ['histamine']],
+  [['palm oil','coconut oil','butter','lard','tallow','heavy cream','mayonnaise','fried','deep fried'], ['high_fat']]
+];
+
+/* Split a label's ingredient blob into individual ingredients.
+   Handles commas, parentheses, and the usual label punctuation. */
+function parseIngredients(text){
+  if(!text) return [];
+  var t = String(text).toLowerCase();
+  t = t.replace(/^\s*ingredients?\s*:?/i,'');
+  t = t.replace(/contains[^.]*\./gi,'');       // allergen statement
+  t = t.replace(/[()\[\]]/g,',');
+  return t.split(/[,;.]/)
+    .map(function(x){ return x.replace(/\*|\d+%|\s+/g,' ').trim(); })
+    .filter(function(x){ return x.length>1 && x.length<60; });
+}
+
+/* Exclusions run per-ingredient and kill a tag that a keyword
+   would otherwise trigger. Without these you get classics like
+   "maltitol" matching "malt" -> gluten, or "cocoa butter"
+   matching "butter" -> dairy. */
+var TAG_EXCLUSIONS = {
+  lactose: ['isolate','protein isolate','hydrolysate','clarified','ghee','butter oil'],
+  dairy_protein: ['cocoa butter','shea butter','nut butter','peanut butter','almond butter',
+                  'coconut butter','cashew butter','butter flavor','oat milk','almond milk',
+                  'soy milk','coconut milk','rice milk','coconut cream','milk thistle'],
+  gluten: ['gluten free','gluten-free','buckwheat'],
+  nuts: ['nutmeg','coconut','water chestnut'],
+  high_fat: ['buttermilk','butter flavor']
+};
+
+/* Word-boundary match. 'malt' must not fire on 'maltitol'.
+   Multi-word keys are matched as phrases. */
+function keywordHits(text, key){
+  var esc = key.replace(/[.*+?^${}()|[\]\\]/g,'\\/*__JS__*/');
+  return new RegExp('(^|[^a-z])' + esc + '(s|es)?($|[^a-z])').test(text);
+}
+
+function tagIngredients(ingredients){
+  var found = {};
+  ingredients.forEach(function(raw){
+    var ing = ' ' + raw.toLowerCase() + ' ';
+    INGREDIENT_TAGS.forEach(function(rule){
+      var keys = rule[0], tags = rule[1];
+      var hit = false;
+      for(var i=0;i<keys.length;i++){
+        if(keywordHits(ing, keys[i])){ hit = true; break; }
+      }
+      if(!hit) return;
+      tags.forEach(function(tg){
+        var ex = TAG_EXCLUSIONS[tg] || [];
+        for(var j=0;j<ex.length;j++){
+          if(ing.indexOf(ex[j]) !== -1) return;   // excluded for this tag
+        }
+        found[tg] = true;
+      });
+    });
+  });
+  return Object.keys(found);
+}
+
+/* A meal item may be a plain food or a saved product.
+   Products expand into: the product itself + its tags.
+   The product stays testable on its own so you can find
+   "this specific bar" even when no single tag explains it. */
+function expandMealItems(items, products){
+  var out = {};
+  (items||[]).forEach(function(it){
+    out[it] = true;
+    var p = products[it];
+    if(p && p.tags) p.tags.forEach(function(tg){ out['#'+tg] = true; });
+  });
+  return Object.keys(out);
+}
+
+function expandMeals(meals, products){
+  products = products || {};
+  return meals.map(function(m){
+    return { at:m.at, items: expandMealItems(m.items, products) };
+  });
+}
+
+function isTag(item){ return item.charAt(0)==='#'; }
+function tagLabel(item){
+  var k = item.slice(1);
+  return TAGS[k] ? TAGS[k].label : k;
+}
+function tagWhy(item){
+  var k = item.slice(1);
+  return TAGS[k] ? TAGS[k].why : '';
+}
+
+/* ============================================================
+   NUTRITION
+
+   Stored per serving, with the serving described in plain text.
+   Portions are a multiplier, so half a bar is 0.5 and nothing
+   needs re-deriving. Everything is optional: a product with no
+   nutrition still works for correlation.
+   ============================================================ */
+
+var NUTRIENTS = [
+  { key:'kcal',    label:'Calories', unit:'kcal', dp:0 },
+  { key:'protein', label:'Protein',  unit:'g',    dp:1 },
+  { key:'carbs',   label:'Carbs',    unit:'g',    dp:1 },
+  { key:'fat',     label:'Fat',      unit:'g',    dp:1 },
+  { key:'fiber',   label:'Fiber',    unit:'g',    dp:1 },
+  { key:'sugars',  label:'Sugars',   unit:'g',    dp:1 }
+];
+
+function emptyTotals(){
+  var t = {};
+  NUTRIENTS.forEach(function(n){ t[n.key]=0; });
+  t._counted = 0; t._missing = 0;
+  return t;
+}
+
+/* Totals for one calendar day. Items without a portion or without
+   nutrition data are counted as missing, not as zero — a total
+   that silently omits half your food is worse than no total. */
+function dailyTotals(meals, products, dayISO){
+  var day = dayISO.slice(0,10);
+  var t = emptyTotals();
+  meals.forEach(function(m){
+    if((m.at||'').slice(0,10) !== day) return;
+    (m.items||[]).forEach(function(it){
+      var p = products[it];
+      var portion = (m.portions||{})[it];
+      if(!p || !p.nutrition || !portion){ t._missing++; return; }
+      t._counted++;
+      NUTRIENTS.forEach(function(n){
+        var v = p.nutrition[n.key];
+        if(typeof v === 'number') t[n.key] += v * portion;
+      });
+    });
+  });
+  NUTRIENTS.forEach(function(n){ t[n.key] = Math.round(t[n.key]*10)/10; });
+  t.kcal = Math.round(t.kcal);
+  return t;
+}
+
+/* Open Food Facts -> our shape. Public API, no key, CORS open,
+   so this works even when the Worker is not configured. */
+function offToProduct(json){
+  if(!json || json.status !== 1 || !json.product) return null;
+  var p = json.product;
+  var n = p.nutriments || {};
+  var qty = parseFloat(p.serving_quantity);
+  var basis = (qty && qty > 0) ? qty/100 : 1;
+  var label = (qty && qty > 0) ? (p.serving_size || (qty+' g')) : '100 g';
+
+  function per(key){
+    var v = n[key+'_100g'];
+    if(typeof v !== 'number') return null;
+    return Math.round(v * basis * 10)/10;
+  }
+  var kcal = n['energy-kcal_100g'];
+  var ing = parseIngredients(p.ingredients_text || '');
+
+  return {
+    name: (p.product_name || '').toLowerCase().trim(),
+    servingLabel: label,
+    ingredients: ing,
+    tags: tagIngredients(ing),
+    nutrition: {
+      kcal: typeof kcal==='number' ? Math.round(kcal*basis) : null,
+      protein: per('proteins'), carbs: per('carbohydrates'),
+      fat: per('fat'), fiber: per('fiber'), sugars: per('sugars')
+    },
+    source: 'openfoodfacts'
+  };
+}
 
 /* ---------------------------------------- */
 
@@ -1245,35 +1586,67 @@ function permutationTest(meals, stools, opts) {
              note: 'Not enough exposures to test anything yet. Keep logging.' };
   }
 
-  var nullMax = new Array(B);
+  /* Rare items swing wildly; common items do not. Comparing raw
+     lifts against one shared null lets a 10-exposure item inflate
+     the threshold and hide a 30-exposure item with a real signal.
+
+     So we studentize: each item is scored against ITS OWN null
+     spread, then we take the max of the standardized scores.
+     Family-wise error stays controlled, but items with different
+     exposure counts now compete on equal footing. */
+  var nullByItem = {};
+  tested.forEach(function (it) { nullByItem[it] = new Array(B); });
+
   var shuf = outcomes.slice();
   for (var b = 0; b < B; b++) {
     for (var i = shuf.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
       var t = shuf[i]; shuf[i] = shuf[j]; shuf[j] = t;
     }
-    var s = scoreFromIndex(ex, shuf, badTypes).scores;
-    var mx = 0;
+    var sc = scoreFromIndex(ex, shuf, badTypes).scores;
     for (var q = 0; q < tested.length; q++) {
-      var v = s[tested[q]].signal;
-      if (v > mx) mx = v;
+      nullByItem[tested[q]][b] = sc[tested[q]].signal;
     }
-    nullMax[b] = mx;
+  }
+
+  var stats = {};
+  tested.forEach(function (it) {
+    var arr = nullByItem[it], sum = 0;
+    for (var k = 0; k < B; k++) sum += arr[k];
+    var mean = sum / B, ss = 0;
+    for (var k2 = 0; k2 < B; k2++) ss += (arr[k2] - mean) * (arr[k2] - mean);
+    var sd = Math.sqrt(ss / (B - 1)) || 1e-9;
+    stats[it] = { mean: mean, sd: sd };
+  });
+
+  function z(it, v) { return (v - stats[it].mean) / stats[it].sd; }
+
+  // Null distribution of the MAX standardized score.
+  var nullMaxZ = new Array(B);
+  for (var b2 = 0; b2 < B; b2++) {
+    var mx = -Infinity;
+    for (var q2 = 0; q2 < tested.length; q2++) {
+      var zz = z(tested[q2], nullByItem[tested[q2]][b2]);
+      if (zz > mx) mx = zz;
+    }
+    nullMaxZ[b2] = mx;
   }
 
   var results = tested.map(function (it) {
     var o = obs.scores[it];
+    var zObs = z(it, o.signal);
     var atLeast = 0;
-    for (var b2 = 0; b2 < B; b2++) if (nullMax[b2] >= o.signal) atLeast++;
+    for (var b3 = 0; b3 < B; b3++) if (nullMaxZ[b3] >= zObs) atLeast++;
     return {
       item: it,
       lift: o.lift,
       peakLift: o.peakLift,
       peakExposures: o.peakExposures,
+      z: round(zObs, 2),
       p: round((atLeast + 1) / (B + 1), 4),   // +1: p is never exactly 0
       confidence: confidenceLabel(o.peakExposures)
     };
-  }).sort(function (x, y) { return x.p - y.p; });
+  }).sort(function (x, y) { return x.p - y.p || y.z - x.z; });
 
   return {
     all: results,
@@ -1678,10 +2051,11 @@ function supplementsForAI(courses, referenceISO) {
    UI + STORAGE
    ============================================================ */
 
-var DB = null, DBNAME = 'healthlog', STORES = ['obs','stools','meals','supps','metrics','settings'];
+var DB = null, DBNAME = 'healthlog', DBVER = 2,
+    STORES = ['obs','stools','meals','supps','metrics','products','settings'];
 
 function dbOpen(cb){
-  var r = indexedDB.open(DBNAME, 1);
+  var r = indexedDB.open(DBNAME, DBVER);
   r.onupgradeneeded = function(e){
     var db = e.target.result;
     STORES.forEach(function(s){ if(!db.objectStoreNames.contains(s)) db.createObjectStore(s,{keyPath:'id'}); });
@@ -1710,7 +2084,7 @@ function dbDel(store, id, cb){
   tx.oncomplete = function(){ cb && cb(null); };
 }
 
-var STATE = { obs:[], stools:[], meals:[], supps:[], metrics:[], settings:{} };
+var STATE = { obs:[], stools:[], meals:[], supps:[], metrics:[], products:[], settings:{} };
 
 function loadAll(cb){
   var pending = STORES.length;
@@ -1723,6 +2097,12 @@ function loadAll(cb){
   });
 }
 function setSetting(k,v){ STATE.settings[k]=v; dbPut('settings',{id:k,value:v}); }
+
+function productMap(){
+  var m = {};
+  STATE.products.forEach(function(p){ m[p.name] = p; });
+  return m;
+}
 
 function uid(p){ return (p||'x')+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7); }
 function todayISO(){ var d=new Date(); return d.toISOString().slice(0,16); }
@@ -1742,7 +2122,8 @@ function go(screen){
   if(screen==='trends') renderTrends();
   if(screen==='labs') renderLabs();
   if(screen==='supps') renderSupps();
-  if(screen==='log') renderLog();
+  if(screen==='products') renderProducts();
+  if(screen==='log'){ renderLog(); renderDaily(); }
   if(screen==='hub') renderHub();
 }
 
@@ -1836,49 +2217,184 @@ function saveStool(){
 
 /* ---------- LOG: MEAL ---------- */
 var mealDraft = [];
+var mealPortions = {};
 function renderMealChips(){
+  var pm = productMap();
   el('meal-chips').innerHTML = mealDraft.map(function(m,i){
-    return '<span class="chip">'+esc(m)+'<button data-rmchip="'+i+'">×</button></span>';
+    var p = pm[m];
+    var hasNut = p && p.nutrition && p.nutrition.kcal!=null;
+    var port = mealPortions[m];
+    return '<div class="chiprow"><span class="chip">'+esc(m)+
+      '<button data-rmchip="'+i+'">×</button></span>'+
+      (hasNut
+        ? '<span class="portwrap"><input class="portin" type="number" step="0.25" min="0" '+
+          'data-port="'+esc(m)+'" value="'+(port==null?'':port)+'" placeholder="qty">'+
+          '<span class="portlbl">× '+esc(p.servingLabel||'serving')+'</span>'+
+          (port ? '<span class="portkcal">'+Math.round(p.nutrition.kcal*port)+' kcal</span>' : '')+
+          '</span>'
+        : '')+
+      '</div>';
   }).join('') || '<span class="muted">No items yet</span>';
 
-  var seen = {}, freq = {};
-  STATE.meals.forEach(function(m){ (m.items||[]).forEach(function(it){ freq[it]=(freq[it]||0)+1; }); });
-  var top = Object.keys(freq).sort(function(a,b){return freq[b]-freq[a];}).slice(0,12);
-  el('meal-recent').innerHTML = top.map(function(t){
-    return '<button class="pill sm" data-addchip="'+esc(t)+'">'+esc(t)+'</button>';
-  }).join('');
+  var top = itemHistory().filter(function(h){
+    return mealDraft.indexOf(h.item)===-1;
+  }).slice(0,12);
+  el('meal-recent').innerHTML = top.length
+    ? top.map(function(h){
+        return '<button class="pill sm" data-addchip="'+esc(h.item)+'">'+esc(h.item)+'</button>';
+      }).join('')
+    : '';
 }
 function addChip(v){
   v = (v||'').trim().toLowerCase();
   if(!v) return;
   if(mealDraft.indexOf(v)===-1) mealDraft.push(v);
   el('meal-input').value='';
+  el('meal-suggest').innerHTML='';
   renderMealChips();
+}
+
+/* Historia skladnikow, posortowana po czestosci uzycia.
+   Wazne dla jakosci danych: jesli raz wpiszesz "milk", a raz "mleko",
+   silnik korelacji potraktuje je jako dwa rozne skladniki i rozmyje
+   sygnal. Podpowiedzi wymuszaja spojne nazewnictwo. */
+function itemHistory(){
+  var freq = {};
+  STATE.meals.forEach(function(m){
+    (m.items||[]).forEach(function(it){ freq[it]=(freq[it]||0)+1; });
+  });
+  STATE.products.forEach(function(p){ if(freq[p.name]===undefined) freq[p.name]=0; });
+  return Object.keys(freq).sort(function(a,b){
+    return freq[b]-freq[a] || a.localeCompare(b);
+  }).map(function(k){ return { item:k, n:freq[k] }; });
+}
+
+function renderSuggestions(q){
+  q = (q||'').trim().toLowerCase();
+  var box = el('meal-suggest');
+  if(!q){ box.innerHTML=''; return; }
+  var hits = itemHistory().filter(function(h){
+    return h.item.indexOf(q)!==-1 && mealDraft.indexOf(h.item)===-1;
+  }).slice(0,6);
+  if(!hits.length){ box.innerHTML=''; return; }
+  box.innerHTML = hits.map(function(h){
+    var i = h.item.indexOf(q);
+    var marked = esc(h.item.slice(0,i))+'<b>'+esc(h.item.slice(i,i+q.length))+'</b>'+esc(h.item.slice(i+q.length));
+    return '<button class="sugg" data-addchip="'+esc(h.item)+'">'+marked+
+           '<span class="suggn">'+h.n+'x</span></button>';
+  }).join('');
 }
 function saveMeal(){
   if(!mealDraft.length){ toast('Add at least one item'); return; }
-  var rec = { id: uid('ml'), at: el('meal-time').value || todayISO(), items: mealDraft.slice() };
+  var ports = {};
+  mealDraft.forEach(function(m){ if(mealPortions[m]) ports[m]=mealPortions[m]; });
+  var rec = { id: uid('ml'), at: el('meal-time').value || todayISO(),
+              items: mealDraft.slice(), portions: ports };
   dbPut('meals', rec, function(){
     STATE.meals.push(rec);
     STATE.meals.sort(function(a,b){ return new Date(a.at)-new Date(b.at); });
-    mealDraft = []; renderMealChips(); toast('Saved');
+    mealDraft = []; mealPortions = {};
+    renderMealChips(); renderDaily(); toast('Saved');
   });
 }
 
+/* ---------- DAILY MACROS ---------- */
+function goals(){ return STATE.settings.goals || {}; }
+
+function renderDaily(){
+  var day = (el('meal-time').value || todayISO()).slice(0,10);
+  var t = dailyTotals(STATE.meals, productMap(), day);
+  var g = goals();
+
+  var rows = NUTRIENTS.map(function(n){
+    var val = t[n.key];
+    var goal = g[n.key];
+    var pct = goal ? Math.min(100, Math.round(100*val/goal)) : null;
+    var over = goal && val > goal;
+    return '<div class="nrow">'+
+      '<div class="nhead"><span class="nlab">'+esc(n.label)+'</span>'+
+      '<span class="nval">'+val+'<em>'+esc(n.unit)+'</em>'+
+      (goal?'<span class="ngoal"> / '+goal+'</span>':'')+'</span></div>'+
+      (goal?'<div class="nbar"><div class="nfill'+(over?' over':'')+'" style="width:'+pct+'%"></div></div>':'')+
+      '</div>';
+  }).join('');
+
+  var note = '';
+  if(t._missing > 0){
+    note = '<div class="nmiss">'+t._missing+' item'+(t._missing>1?'s':'')+
+      ' not counted — no portion entered or no nutrition data. Totals are a floor, not the full picture.</div>';
+  } else if(t._counted === 0){
+    note = '<div class="nmiss">Nothing counted yet today. Add a portion to a saved product to see totals.</div>';
+  }
+
+  el('daily-totals').innerHTML = '<div class="dayhead">'+day+'</div>'+rows+note;
+}
+
+function saveGoals(){
+  var g = {};
+  NUTRIENTS.forEach(function(n){
+    var v = parseFloat(el('goal-'+n.key).value);
+    if(!isNaN(v) && v>0) g[n.key]=v;
+  });
+  setSetting('goals', g);
+  renderDaily(); toast('Goals saved');
+}
+function renderGoalInputs(){
+  var g = goals();
+  el('goal-fields').innerHTML = NUTRIENTS.map(function(n){
+    return '<div><label for="goal-'+n.key+'">'+esc(n.label)+' ('+esc(n.unit)+')</label>'+
+      '<input type="number" step="any" id="goal-'+n.key+'" value="'+(g[n.key]==null?'':g[n.key])+'"></div>';
+  }).join('');
+}
+
 /* ---------- METRICS (weight + custom) ---------- */
+/* Kanonicznie w bazie: kg i cm. Wyswietlanie przeliczane.
+   Dzieki temu zmiana jednostki nie psuje historii ani BMI. */
 var DEFAULT_METRICS = [
-  { key:'weight', label:'Weight', unit:'kg', builtin:true },
-  { key:'height', label:'Height', unit:'cm', builtin:true }
+  { key:'weight', label:'Weight', unit:'kg', builtin:true,
+    units:{ 'kg':1, 'lb':0.453592 } },
+  { key:'height', label:'Height', unit:'cm', builtin:true,
+    units:{ 'cm':1, 'in':2.54 } }
 ];
 function allMetricDefs(){
   var custom = STATE.settings.customMetrics || [];
   return DEFAULT_METRICS.concat(custom);
 }
+function metricDef(key){
+  var d = allMetricDefs().filter(function(m){ return m.key===key; })[0];
+  return d || null;
+}
+/* Jednostka wybrana przez uzytkownika dla tej metryki */
+function displayUnit(key){
+  var d = metricDef(key);
+  if(!d) return '';
+  if(!d.units) return d.unit;
+  var pref = (STATE.settings.metricUnits||{})[key];
+  return (pref && d.units[pref]) ? pref : d.unit;
+}
+function toDisplay(key, canonical){
+  var d = metricDef(key);
+  if(!d||!d.units) return canonical;
+  var f = d.units[displayUnit(key)];
+  return Math.round((canonical/f)*10)/10;
+}
+function toCanonical(key, shown){
+  var d = metricDef(key);
+  if(!d||!d.units) return shown;
+  return shown * d.units[displayUnit(key)];
+}
+function setMetricUnit(key, unit){
+  var m = STATE.settings.metricUnits || {};
+  m[key] = unit;
+  setSetting('metricUnits', m);
+  renderMetrics();
+}
 function renderMetrics(){
   var defs = allMetricDefs();
   el('metric-select').innerHTML = defs.map(function(d){
-    return '<option value="'+d.key+'">'+esc(d.label)+' ('+esc(d.unit)+')</option>';
+    return '<option value="'+d.key+'">'+esc(d.label)+' ('+esc(displayUnit(d.key))+')</option>';
   }).join('');
+  renderUnitToggle();
 
   var byKey = {};
   STATE.metrics.forEach(function(m){ (byKey[m.key]=byKey[m.key]||[]).push(m); });
@@ -1888,17 +2404,29 @@ function renderMetrics(){
     if(!rows.length) return '';
     var latest = rows[0];
     var prev = rows[1];
-    var delta = prev ? (latest.value-prev.value) : null;
+    var shown = toDisplay(d.key, latest.value);
+    var delta = prev ? (toDisplay(d.key, latest.value)-toDisplay(d.key, prev.value)) : null;
     return '<div class="mrow"><div><div class="mlab">'+esc(d.label)+'</div>'+
       '<div class="msub">'+fmtDate(latest.at)+' · '+rows.length+' readings</div></div>'+
-      '<div class="mval">'+latest.value+'<span class="munit">'+esc(d.unit)+'</span>'+
-      (delta!==null?'<div class="mdelta '+(delta>0?'up':'down')+'">'+(delta>0?'+':'')+Math.round(delta*10)/10+'</div>':'')+
+      '<div class="mval">'+shown+'<span class="munit">'+esc(displayUnit(d.key))+'</span>'+
+      (delta!==null&&delta!==0?'<div class="mdelta '+(delta>0?'up':'down')+'">'+(delta>0?'+':'')+Math.round(delta*10)/10+'</div>':'')+
       '</div></div>';
   }).join('');
 
   var bmi = calcBMI();
   el('metric-list').innerHTML = (bmi ? '<div class="bmibox"><div class="mlab">BMI</div><div class="bmival">'+bmi.value+'</div><div class="msub">'+bmi.band+'</div></div>' : '') + (html || '<p class="muted">No readings yet.</p>');
 }
+function renderUnitToggle(){
+  var key = el('metric-select').value;
+  var d = metricDef(key);
+  var box = el('unit-toggle');
+  if(!d || !d.units){ box.innerHTML=''; return; }
+  var cur = displayUnit(key);
+  box.innerHTML = Object.keys(d.units).map(function(u){
+    return '<button class="pill sm'+(u===cur?' on':'')+'" data-unit="'+key+'|'+u+'">'+esc(u)+'</button>';
+  }).join('');
+}
+
 function calcBMI(){
   var w = latestMetric('weight'), h = latestMetric('height');
   if(!w||!h||!h.value) return null;
@@ -1916,7 +2444,8 @@ function saveMetric(){
   var key = el('metric-select').value;
   var v = parseFloat(el('metric-value').value);
   if(isNaN(v)){ toast('Enter a number'); return; }
-  var rec = { id: uid('mt'), key:key, value:v, at: el('metric-time').value || todayISO() };
+  var rec = { id: uid('mt'), key:key, value:toCanonical(key, v),
+              at: el('metric-time').value || todayISO() };
   dbPut('metrics', rec, function(){
     STATE.metrics.push(rec); el('metric-value').value='';
     renderMetrics(); toast('Saved');
@@ -2175,17 +2704,207 @@ function saveExtracted(){
   renderLabs();
 }
 
+/* ---------- PACKAGED FOODS ---------- */
+var prodDraft = { name:'', ingredients:[], tags:[], nutrition:null, servingLabel:'' };
+
+function renderProducts(){
+  el('prod-list').innerHTML = STATE.products.length
+    ? STATE.products.map(function(p){
+        return '<div class="prodcard"><div class="srow"><span class="sname">'+esc(p.name)+'</span>'+
+          '<button class="mini danger" data-delprod="'+p.id+'">Delete</button></div>'+
+          '<div class="ptags">'+p.tags.map(function(tg){
+            return '<span class="ptag">'+esc(TAGS[tg]?TAGS[tg].label:tg)+'</span>';
+          }).join('')+'</div>'+
+          (p.nutrition&&p.nutrition.kcal!=null
+            ? '<div class="pnut">'+p.nutrition.kcal+' kcal · P '+(p.nutrition.protein||0)+
+              ' · C '+(p.nutrition.carbs||0)+' · F '+(p.nutrition.fat||0)+
+              '<span class="msub"> per '+esc(p.servingLabel||'serving')+'</span></div>'
+            : '<div class="msub">No nutrition data</div>')+
+          '<div class="msub">'+p.ingredients.length+' ingredients</div></div>';
+      }).join('')
+    : '<p class="muted">No packaged foods saved yet.</p>';
+}
+
+function parseProductText(){
+  var txt = el('prod-ingredients').value;
+  var ing = parseIngredients(txt);
+  if(!ing.length){ toast('No ingredients found'); return; }
+  prodDraft.ingredients = ing;
+  prodDraft.tags = tagIngredients(ing);
+  showProdPreview();
+}
+
+function showProdPreview(){
+  var box = el('prod-preview');
+  if(!prodDraft.ingredients.length){ box.innerHTML=''; return; }
+  box.innerHTML = '<div class="ckhead">Detected groups</div>'+
+    (prodDraft.tags.length
+      ? '<div class="ptags">'+prodDraft.tags.map(function(tg){
+          return '<button class="ptag on" data-rmtag="'+tg+'">'+esc(TAGS[tg]?TAGS[tg].label:tg)+' ×</button>';
+        }).join('')+'</div>'+
+        '<div class="cwhy">'+prodDraft.tags.map(function(tg){
+          return TAGS[tg]&&TAGS[tg].why ? esc(TAGS[tg].label)+': '+esc(TAGS[tg].why) : '';
+        }).filter(Boolean).join('<br>')+'</div>'
+      : '<p class="muted">No known gut-relevant groups found. The product is still tracked on its own.</p>')+
+    '<div class="msub" style="margin-top:8px">'+prodDraft.ingredients.length+' ingredients parsed</div>';
+  if(prodDraft.nutrition){
+    NUTRIENTS.forEach(function(n){
+      var v = prodDraft.nutrition[n.key];
+      if(v!=null && el('nut-'+n.key).value==='') el('nut-'+n.key).value = v;
+    });
+  }
+  if(prodDraft.servingLabel && !el('prod-serving').value)
+    el('prod-serving').value = prodDraft.servingLabel;
+  el('prod-save').style.display='block';
+}
+
+function saveProduct(){
+  var name = (el('prod-name').value||'').trim().toLowerCase();
+  if(!name){ toast('Give it a name'); return; }
+  if(!prodDraft.ingredients.length){ toast('Read the ingredients first'); return; }
+  var nut = {};
+  var anyNut = false;
+  NUTRIENTS.forEach(function(n){
+    var v = parseFloat(el('nut-'+n.key).value);
+    if(!isNaN(v)){ nut[n.key]=v; anyNut=true; } else nut[n.key]=null;
+  });
+  var rec = { id: uid('pr'), name:name, ingredients:prodDraft.ingredients,
+              tags:prodDraft.tags.slice(), at:new Date().toISOString(),
+              servingLabel: (el('prod-serving').value||'').trim() || '1 serving',
+              nutrition: anyNut ? nut : null };
+  dbPut('products', rec, function(){
+    STATE.products.push(rec);
+    prodDraft = { name:'', ingredients:[], tags:[], nutrition:null, servingLabel:'' };
+    el('prod-name').value=''; el('prod-ingredients').value='';
+    el('prod-serving').value=''; el('prod-barcode').value='';
+    NUTRIENTS.forEach(function(n){ el('nut-'+n.key).value=''; });
+    el('prod-preview').innerHTML=''; el('prod-save').style.display='none';
+    renderProducts(); toast('Saved. It will show up in meal suggestions.');
+  });
+}
+
+/* Photo of an ingredient label -> text. Same Worker path as lab photos. */
+function readLabelPhoto(file){
+  var ep = STATE.settings.endpoint;
+  if(!ep){ toast('Set your Worker URL in Settings first'); go('settings'); return; }
+  var fr = new FileReader();
+  fr.onload = function(){
+    var b64 = fr.result.split(',')[1];
+    el('prod-step').textContent = 'Reading label...';
+    fetch(ep, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:1200,
+        messages:[{ role:'user', content:[
+          { type:'image', source:{ type:'base64', media_type:'image/jpeg', data:b64 } },
+          { type:'text', text:'Read this food label. Return ONLY JSON, no markdown fences: '+
+            '{"ingredients":"the ingredient text exactly as printed or empty string",'+
+            '"servingLabel":"serving size as printed, e.g. 1 bar (60g)",'+
+            '"kcal":number|null,"protein":number|null,"carbs":number|null,'+
+            '"fat":number|null,"fiber":number|null,"sugars":number|null}. '+
+            'All nutrition values must be PER SERVING as printed on the label, not per 100g '+
+            'unless the label itself uses 100g as the serving.' }
+        ]}] })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      var txt = (d.content||[]).filter(function(i){return i.type==='text';}).map(function(i){return i.text;}).join('');
+      txt = txt.replace(/```json|```/g,'').trim();
+      var parsed;
+      try { parsed = JSON.parse(txt); }
+      catch(e){ el('prod-step').textContent='Could not parse the label. Type it in.'; return; }
+      if(parsed.ingredients) el('prod-ingredients').value = parsed.ingredients;
+      if(parsed.servingLabel) el('prod-serving').value = parsed.servingLabel;
+      prodDraft.nutrition = {};
+      NUTRIENTS.forEach(function(n){
+        var v = parsed[n.key];
+        prodDraft.nutrition[n.key] = (typeof v === 'number') ? v : null;
+      });
+      el('prod-step').textContent = 'Read it. Check every number against the label before saving.';
+      if(parsed.ingredients) parseProductText(); else showProdPreview();
+    }).catch(function(){ el('prod-step').textContent='Could not read it. Type it in.'; });
+  };
+  fr.readAsDataURL(file);
+}
+
+/* --- Open Food Facts lookup --- */
+function lookupBarcode(code){
+  code = (code||'').replace(/\D/g,'');
+  if(code.length < 8){ toast('Barcode looks too short'); return; }
+  el('prod-step').textContent = 'Looking up '+code+'...';
+  fetch('https://world.openfoodfacts.org/api/v2/product/'+code+
+        '.json?fields=product_name,nutriments,ingredients_text,serving_size,serving_quantity')
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var p = offToProduct(j);
+      if(!p){ el('prod-step').textContent='Not in Open Food Facts. Use the label photo instead.'; return; }
+      if(p.name) el('prod-name').value = p.name;
+      el('prod-ingredients').value = p.ingredients.join(', ');
+      prodDraft.ingredients = p.ingredients;
+      prodDraft.tags = p.tags;
+      prodDraft.nutrition = p.nutrition;
+      prodDraft.servingLabel = p.servingLabel;
+      el('prod-step').textContent = 'Found. Check everything before saving — community data is not always right.';
+      showProdPreview();
+    })
+    .catch(function(){ el('prod-step').textContent='Lookup failed. Check your connection.'; });
+}
+
+/* Native barcode reading where the browser supports it.
+   iOS Safari does not, so manual entry stays the reliable path. */
+function scanBarcode(file){
+  if(typeof BarcodeDetector === 'undefined'){
+    el('prod-step').textContent = 'This browser cannot read barcodes. Type the number instead.';
+    return;
+  }
+  var img = new Image();
+  img.onload = function(){
+    new BarcodeDetector().detect(img).then(function(codes){
+      if(!codes.length){ el('prod-step').textContent='No barcode found. Type the number instead.'; return; }
+      el('prod-barcode').value = codes[0].rawValue;
+      lookupBarcode(codes[0].rawValue);
+    }).catch(function(){ el('prod-step').textContent='Could not read it. Type the number instead.'; });
+  };
+  var fr = new FileReader();
+  fr.onload = function(){ img.src = fr.result; };
+  fr.readAsDataURL(file);
+}
+
 /* ---------- SUPPLEMENTS ---------- */
+/* Suplementy spoza katalogu. Kluczowe: NIE maja danych o interferencji,
+   wiec apka nie moze udawac, ze wie, czy fałszuja wyniki. Brak wpisu
+   w katalogu != brak wplywu na badania. */
+function customSupps(){ return STATE.settings.customSupps || {}; }
+function allSupps(){
+  var out = {}, c = customSupps();
+  Object.keys(SUPPLEMENTS).forEach(function(k){ out[k]=SUPPLEMENTS[k]; });
+  Object.keys(c).forEach(function(k){ out[k]=c[k]; });
+  return out;
+}
+function suppDef(key){ return allSupps()[key] || null; }
+
+function addCustomSupp(){
+  var name = prompt('Supplement name:');
+  if(!name || !name.trim()) return;
+  var unit = prompt('Dose unit (mg, g, IU, ug):') || 'mg';
+  var c = customSupps();
+  var key = 'x_'+name.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,24)+'_'+Date.now().toString(36).slice(-4);
+  c[key] = { label:name.trim(), unit:unit.trim(), group:'custom', interferes:[], custom:true,
+    note:'Not in the interference catalog. The app cannot tell you whether this skews lab results — check with a pharmacist or your doctor before testing.' };
+  setSetting('customSupps', c);
+  renderSupps();
+  el('supp-select').value = key;
+  toast('Added to your list');
+}
+
 function renderSupps(){
-  el('supp-select').innerHTML = Object.keys(SUPPLEMENTS).map(function(k){
-    return '<option value="'+k+'">'+esc(SUPPLEMENTS[k].label)+'</option>';
+  var all = allSupps();
+  el('supp-select').innerHTML = Object.keys(all).map(function(k){
+    return '<option value="'+k+'">'+esc(all[k].label)+(all[k].custom?' *':'')+'</option>';
   }).join('');
 
   var active = STATE.supps.filter(function(s){ return !s.stoppedAt; });
   var past = STATE.supps.filter(function(s){ return s.stoppedAt; });
 
   function card(c){
-    var s = SUPPLEMENTS[c.key];
+    var s = suppDef(c.key);
+    if(!s) return '';
     var warn = s.interferes.length ? s.interferes.map(function(r){
       return ANALYTES[r.analyte] ? ANALYTES[r.analyte].label+' '+(r.direction==='up'?'↑':'↓') : '';
     }).filter(Boolean).join(', ') : '';
@@ -2194,6 +2913,7 @@ function renderSupps(){
       '<span class="sdose">'+(c.dose!=null?c.dose+' '+esc(c.unit):'')+'</span></div>'+
       '<div class="msub">od '+fmtDate(c.startedAt)+(c.stoppedAt?' do '+fmtDate(c.stoppedAt):'')+'</div>'+
       (warn?'<div class="sint">skews results: '+esc(warn)+'</div>':'')+
+      (s.custom?'<div class="scustom">No interference data</div>':'')+
       (s.note?'<div class="snote">'+esc(s.note)+'</div>':'')+
       '<div class="sacts">'+(c.stoppedAt?'':'<button class="mini" data-stop="'+c.id+'">Odstaw</button>')+
       '<button class="mini danger" data-delsupp="'+c.id+'">Delete</button></div></div>';
@@ -2202,6 +2922,20 @@ function renderSupps(){
   el('supp-past').innerHTML = past.map(card).join('');
 }
 function addSupp(){
+  var key = el('supp-select').value;
+  var cd = customSupps()[key];
+  if(cd){
+    // Kurs wlasnego suplementu — omija katalog, bo go tam nie ma.
+    var course = { v:1, id:uid('s'), key:key,
+      dose: el('supp-dose').value===''?null:parseFloat(el('supp-dose').value),
+      unit: cd.unit,
+      startedAt: el('supp-start').value || new Date().toISOString().slice(0,10),
+      stoppedAt:null, timeOfDay:null, note:null };
+    dbPut('supps', course, function(){
+      STATE.supps.push(course); el('supp-dose').value=''; renderSupps(); toast('Added');
+    });
+    return;
+  }
   var r = createSupplementCourse({
     key: el('supp-select').value,
     dose: el('supp-dose').value===''?null:parseFloat(el('supp-dose').value),
@@ -2228,7 +2962,7 @@ function renderTrends(){
     out += '<div class="notice">You have '+n+' entries. Correlation analysis needs about 60 days of '+
            'logging to tell a real pattern from chance.</div>';
   } else {
-    var t = permutationTest(STATE.meals, STATE.stools, { permutations:300 });
+    var t = permutationTest(expandMeals(STATE.meals, productMap()), STATE.stools, { permutations:300 });
     if(t.note){ out += '<div class="notice">'+esc(t.note)+'</div>'; }
     else if(!t.significant.length){
       out += '<div class="notice">Tested '+t.tested+' items. '+
@@ -2237,8 +2971,16 @@ function renderTrends(){
     } else {
       out += '<div class="notice good">Candidates worth testing by elimination:</div>';
       out += t.significant.map(function(c){
-        return '<div class="cand"><div class="crow"><span class="cname">'+esc(c.item)+'</span>'+
-          '<span class="clift">×'+c.peakLift+'</span></div>'+
+        var tag = isTag(c.item);
+        var pm = productMap();
+        var kind = tag ? 'ingredient group' : (pm[c.item] ? 'product' : 'food');
+        var name = tag ? tagLabel(c.item) : c.item;
+        var why  = tag ? tagWhy(c.item) : '';
+        return '<div class="cand'+(tag?' istag':'')+'">'+
+          '<div class="crow"><span class="cname">'+esc(name)+'</span>'+
+          '<span class="clift">×'+(c.peakLift||c.lift)+'</span></div>'+
+          '<div class="ckind">'+kind+'</div>'+
+          (why?'<div class="cwhy">'+esc(why)+'</div>':'')+
           '<div class="msub">p = '+c.p+' · '+c.peakExposures+' exposures · confidence: '+c.confidence+'</div></div>';
       }).join('');
       out += '<div class="notice">These are candidates, not causes. Confirm with 2 weeks off, then reintroduce.</div>';
@@ -2364,19 +3106,23 @@ function toast(msg){
 
 /* ---------- EVENT DELEGATION (no inline onclick — Safari) ---------- */
 document.addEventListener('click', function(e){
-  var t = e.target.closest ? e.target.closest('[data-go],[data-bris],[data-opt],[data-addchip],[data-rmchip],[data-stop],[data-delsupp],[data-act]') : null;
+  var t = e.target.closest ? e.target.closest('[data-go],[data-bris],[data-opt],[data-addchip],[data-rmchip],[data-stop],[data-delsupp],[data-unit],[data-delprod],[data-rmtag],[data-act]') : null;
   if(!t) return;
   var d = t.dataset;
   if(d.go) go(d.go);
   else if(d.bris){ stoolDraft.bristol = parseInt(d.bris,10); renderLog(); }
   else if(d.opt){ stoolDraft[d.opt] = d.opt==='color' ? d.val : parseInt(d.val,10); renderLog(); }
+  else if(d.delprod){ dbDel('products',d.delprod,function(){
+      STATE.products = STATE.products.filter(function(p){return p.id!==d.delprod;}); renderProducts(); }); }
+  else if(d.rmtag){ prodDraft.tags = prodDraft.tags.filter(function(x){return x!==d.rmtag;}); showProdPreview(); }
+  else if(d.unit){ var p=d.unit.split('|'); setMetricUnit(p[0],p[1]); }
   else if(d.addchip) addChip(d.addchip);
   else if(d.rmchip){ mealDraft.splice(parseInt(d.rmchip,10),1); renderMealChips(); }
   else if(d.stop) stopSupp(d.stop);
   else if(d.delsupp){ dbDel('supps',d.delsupp,function(){ STATE.supps = STATE.supps.filter(function(s){return s.id!==d.delsupp;}); renderSupps(); }); }
   else if(d.act){
     var m = { saveStool:saveStool, saveMeal:saveMeal, saveMetric:saveMetric, addCustom:addCustomMetric,
-      saveLab:saveLab, addSupp:addSupp, saveSettings:saveSettings, export:doExport,
+      saveLab:saveLab, addSupp:addSupp, addCustomSupp:addCustomSupp, parseProd:parseProductText, saveProd:saveProduct, lookup:function(){ lookupBarcode(el('prod-barcode').value); }, saveGoals:saveGoals, saveSettings:saveSettings, export:doExport,
       extract:extractFromPhoto, saveEx:saveExtracted, send:sendChat, resetMask:resetMask, back:function(){ go('hub'); } };
     m[d.act] && m[d.act]();
   }
@@ -2389,7 +3135,7 @@ function boot(){
     loadAll(function(){
       STATE.stools.sort(function(a,b){return new Date(a.at)-new Date(b.at);});
       STATE.meals.sort(function(a,b){return new Date(a.at)-new Date(b.at);});
-      renderAnalyteSelect(); renderMetrics(); renderSettings(); setupMask(); renderSupps();
+      renderAnalyteSelect(); renderMetrics(); renderSettings(); setupMask(); renderSupps(); renderProducts(); renderGoalInputs(); renderDaily();
       el('stool-time').value = todayISO();
       el('meal-time').value = todayISO();
       el('metric-time').value = todayISO();
@@ -2399,10 +3145,32 @@ function boot(){
   });
 
   el('lab-analyte').addEventListener('change', syncUnits);
-  el('meal-input').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); addChip(this.value); } });
+  el('meal-input').addEventListener('keydown', function(e){
+    if(e.key==='Enter'){ e.preventDefault(); addChip(this.value); }
+    if(e.key==='Escape'){ el('meal-suggest').innerHTML=''; }
+  });
+  el('meal-input').addEventListener('input', function(){ renderSuggestions(this.value); });
+  el('metric-select').addEventListener('change', renderUnitToggle);
   el('chk-blood').addEventListener('change', function(){ stoolDraft.blood=this.checked; checkFlags(); });
   el('chk-pain').addEventListener('change', function(){ stoolDraft.painWakesAtNight=this.checked; checkFlags(); });
   el('photo-input').addEventListener('change', function(){ if(this.files[0]) loadLabPhoto(this.files[0]); });
+  el('label-input').addEventListener('change', function(){ if(this.files[0]) readLabelPhoto(this.files[0]); });
+  el('barcode-input').addEventListener('change', function(){ if(this.files[0]) scanBarcode(this.files[0]); });
+  el('prod-barcode').addEventListener('keydown', function(e){
+    if(e.key==='Enter'){ e.preventDefault(); lookupBarcode(this.value); } });
+  document.addEventListener('input', function(e){
+    var p = e.target.dataset && e.target.dataset.port;
+    if(!p) return;
+    var v = parseFloat(e.target.value);
+    if(isNaN(v)||v<=0) delete mealPortions[p]; else mealPortions[p]=v;
+    var pm = productMap(), pr = pm[p];
+    var box = e.target.parentNode.querySelector('.portkcal');
+    if(pr && pr.nutrition && pr.nutrition.kcal!=null){
+      var kc = mealPortions[p] ? Math.round(pr.nutrition.kcal*mealPortions[p])+' kcal' : '';
+      if(box) box.textContent = kc;
+      else if(kc){ var sp=document.createElement('span'); sp.className='portkcal'; sp.textContent=kc; e.target.parentNode.appendChild(sp); }
+    }
+  });
   el('import-input').addEventListener('change', function(){ if(this.files[0]) doImport(this.files[0]); });
   el('backbtn').addEventListener('click', function(){ go('hub'); });
 }
