@@ -1,0 +1,2413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#EDF1F6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Health Record</title>
+<link rel="manifest" href="data:application/json,{%22name%22:%22Health%20Record%22,%22short_name%22:%22Health%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22background_color%22:%22%23EDF1F6%22,%22theme_color%22:%22%23EDF1F6%22}">
+<style>*,*::before,*::after{box-sizing:border-box}
+:root{
+  /* Clinical blue: cool paper, navy ink, saturated primary.
+     Out-of-range uses a desaturated clinical red, not orange —
+     it has to read as "abnormal" at a glance on a lab chart. */
+  --paper:#EDF1F6; --card:#FBFCFE; --ink:#0F1826; --ink2:#5A6A80;
+  --line:#C4D2E2; --deep:#12507E; --deep2:#2C7BB6;
+  --signal:#B02A26; --dry:#7A6538; --loose:#A05B2C; --ok:#2E7A66;
+  --r:3px;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+html,body{margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font:400 15px/1.5 var(--sans);
+  -webkit-font-smoothing:antialiased;padding-bottom:40px}
+button,input,select,textarea{font:inherit;color:inherit}
+
+/* --- pasek gorny --- */
+header{position:sticky;top:0;z-index:20;background:var(--paper);
+  border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;
+  padding:12px 16px}
+#backbtn{background:none;border:none;padding:4px 8px 4px 0;cursor:pointer;
+  font-size:20px;line-height:1;color:var(--deep)}
+.brand{font:600 13px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--deep)}
+
+.wrap{max-width:520px;margin:0 auto;padding:0 16px}
+.screen{display:none}
+.screen.on{display:block;animation:fade .18s ease}
+@keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.screen.on{animation:none}}
+
+h2{font:600 20px/1.25 var(--sans);margin:22px 0 4px;letter-spacing:-.01em}
+h3{font:600 12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink2);margin:26px 0 10px}
+.sub{color:var(--ink2);font-size:13.5px;margin:0 0 18px}
+.muted{color:var(--ink2);font-size:14px}
+
+/* --- HUB --- */
+.hubstat{display:flex;gap:0;border:1px solid var(--line);background:var(--card);
+  border-radius:var(--r);margin:18px 0}
+.statrow{flex:1;padding:14px 10px;text-align:center;border-right:1px solid var(--line)}
+.statrow:last-child{border-right:none}
+.statnum{display:block;font:600 24px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--deep)}
+.statlab{display:block;font-size:11px;color:var(--ink2);margin-top:5px;line-height:1.3}
+#hub-msg{font-size:13.5px;color:var(--ink2);border-left:2px solid var(--deep);
+  padding-left:12px;margin:0 0 22px}
+
+.tiles{display:grid;gap:10px}
+.tile{display:block;width:100%;text-align:left;background:var(--card);
+  border:1px solid var(--line);border-radius:var(--r);padding:18px 16px;cursor:pointer;
+  transition:border-color .12s,transform .12s}
+.tile:hover,.tile:focus-visible{border-color:var(--deep);transform:translateX(2px)}
+.tile:focus-visible{outline:2px solid var(--deep);outline-offset:2px}
+.tilen{font:600 11px/1 var(--mono);color:var(--deep2);letter-spacing:.1em}
+.tilet{display:block;font:600 17px/1.2 var(--sans);margin:8px 0 4px}
+.tiled{display:block;font-size:13px;color:var(--ink2);line-height:1.4}
+
+.minor{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.minor button{flex:1;min-width:100px;background:none;border:1px solid var(--line);
+  border-radius:var(--r);padding:10px;font-size:13px;cursor:pointer;color:var(--ink2)}
+.minor button:hover{border-color:var(--deep);color:var(--deep)}
+
+/* --- formularze --- */
+label{display:block;font:500 11px/1 var(--mono);letter-spacing:.09em;
+  text-transform:uppercase;color:var(--ink2);margin:14px 0 6px}
+input[type=text],input[type=number],input[type=date],input[type=datetime-local],
+input[type=url],select,textarea{
+  width:100%;background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:9px 10px;font-size:15px;height:38px;font-variant-numeric:tabular-nums}
+textarea{height:auto;min-height:62px;font-family:var(--sans)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--deep);
+  box-shadow:0 0 0 3px rgba(18,80,126,.15)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.four{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+
+.btn{width:100%;background:var(--deep);color:#fff;border:none;border-radius:var(--r);
+  padding:13px;font:600 15px var(--sans);cursor:pointer;margin-top:18px}
+.btn:hover{background:var(--deep2)}
+.btn.ghost{background:none;color:var(--deep);border:1px solid var(--deep)}
+.mini{background:none;border:1px solid var(--line);border-radius:var(--r);
+  padding:5px 10px;font-size:12px;cursor:pointer;color:var(--ink2)}
+.mini.danger{color:var(--signal);border-color:rgba(181,74,24,.35)}
+
+/* --- skala Bristol --- */
+#bristol-list{display:grid;gap:5px}
+.bris{display:grid;grid-template-columns:34px 1fr;align-items:baseline;gap:10px;
+  text-align:left;background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r);padding:11px 12px;cursor:pointer;position:relative}
+.bris::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:transparent}
+.bris.t-dry::before{background:var(--dry)}
+.bris.t-ok::before{background:var(--ok)}
+.bris.t-loose::before{background:var(--loose)}
+.bris.on{border-color:var(--deep);background:#fff;box-shadow:0 0 0 1px var(--deep)}
+.brisn{font:600 18px/1 var(--mono);color:var(--ink2);text-align:center}
+.bris.on .brisn{color:var(--deep)}
+.brist{font-size:14.5px;font-weight:500}
+.brisd{display:block;grid-column:2;font-size:12px;color:var(--ink2);margin-top:2px}
+
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{background:var(--card);border:1px solid var(--line);border-radius:20px;
+  padding:7px 13px;font-size:13.5px;cursor:pointer}
+.pill.on{background:var(--deep);color:#fff;border-color:var(--deep)}
+.pill.sm{padding:5px 11px;font-size:12.5px}
+
+.check{display:flex;align-items:center;gap:9px;margin:11px 0;font-size:14.5px}
+.check input{width:19px;height:19px;flex:none;accent-color:var(--signal)}
+
+#redflags{border:1px solid var(--signal);background:#FBEFEE;border-radius:var(--r);
+  padding:13px;margin:16px 0}
+.rfhead{font:600 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--signal);margin-bottom:8px}
+#redflags p{margin:0 0 6px;font-size:14px;line-height:1.45}
+
+/* --- chipy posilkow --- */
+#meal-chips{display:flex;flex-wrap:wrap;gap:6px;min-height:34px;margin:8px 0}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--deep);color:#fff;
+  border-radius:20px;padding:5px 8px 5px 12px;font-size:13.5px}
+.chip button{background:none;border:none;color:rgba(255,255,255,.75);cursor:pointer;
+  font-size:16px;line-height:1;padding:0 2px}
+
+/* --- metryki --- */
+.mrow{display:flex;justify-content:space-between;align-items:center;
+  border-bottom:1px solid var(--line);padding:13px 0}
+.mlab{font-weight:500;font-size:15px}
+.msub{font-size:12px;color:var(--ink2);margin-top:2px}
+.mval{font:600 21px/1 var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.munit{font-size:12px;color:var(--ink2);margin-left:3px;font-weight:400}
+.mdelta{font:400 12px var(--mono);margin-top:4px}
+.mdelta.up{color:var(--signal)} .mdelta.down{color:var(--ok)}
+.bmibox{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:16px;text-align:center;margin-bottom:14px}
+.bmival{font:600 34px/1 var(--mono);color:var(--deep);margin:6px 0 3px}
+
+/* --- badania --- */
+.labcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:14px;margin-bottom:10px}
+.labhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.lname{font-weight:600;font-size:15px}
+.lval{font:600 18px/1 var(--mono);font-variant-numeric:tabular-nums}
+.lval em{font-size:11px;font-style:normal;color:var(--ink2);font-weight:400}
+.lval.high{color:var(--signal)} .lval.low{color:var(--deep2)}
+.spark{width:100%;height:54px;margin:10px 0 4px;display:block}
+.spark .band{fill:rgba(44,123,182,.14)}
+.spark .line{fill:none;stroke:var(--deep);stroke-width:1.6}
+.spark .dot{fill:var(--deep)}
+.spark .dot.high{fill:var(--signal)} .spark .dot.low{fill:var(--deep2)}
+.lflag,.ldrift,.lart{font-size:12.5px;line-height:1.45;margin-top:8px;
+  padding-left:9px;border-left:2px solid var(--line);color:var(--ink2)}
+.ldrift{border-color:var(--deep2);color:var(--deep2)}
+.lart{border-color:var(--signal);color:var(--signal)}
+
+.exrow{border:1px solid var(--line);background:var(--card);border-radius:var(--r);
+  padding:11px;margin-bottom:8px}
+.exname{font:500 12px var(--mono);color:var(--ink2);margin-bottom:7px;word-break:break-word}
+.exline{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:5px;margin-top:6px}
+.exline input{height:34px;font-size:13px;padding:5px 7px}
+.exsel{height:34px;font-size:13.5px}
+#mask-wrap{margin:14px 0}
+#mask-canvas{width:100%;border:1px solid var(--line);border-radius:var(--r);
+  touch-action:none;cursor:crosshair;background:#fff}
+#photo-step{font-size:13px;color:var(--deep);margin:9px 0 0;line-height:1.45}
+
+/* --- suplementy --- */
+.suppcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:13px;margin-bottom:9px}
+.suppcard.off{opacity:.55}
+.srow{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.sname{font-weight:600;font-size:15px}
+.sdose{font:500 14px var(--mono);color:var(--ink2)}
+.sint{font-size:12.5px;color:var(--signal);margin-top:7px;
+  padding-left:9px;border-left:2px solid var(--signal)}
+.snote{font-size:12.5px;color:var(--ink2);margin-top:7px;line-height:1.45}
+.sacts{display:flex;gap:6px;margin-top:11px}
+
+/* --- trendy --- */
+.notice{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--deep);
+  border-radius:var(--r);padding:13px;font-size:13.5px;line-height:1.5;margin-bottom:11px}
+.notice.good{border-left-color:var(--ok)}
+.cand{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:12px;margin-bottom:8px}
+.crow{display:flex;justify-content:space-between;align-items:baseline}
+.cname{font-weight:600;font-size:15.5px;text-transform:capitalize}
+.clift{font:600 16px var(--mono);color:var(--signal)}
+.distbar{display:grid;gap:6px}
+.distrow{display:grid;grid-template-columns:18px 1fr 40px;align-items:center;gap:9px}
+.dn{font:500 13px var(--mono);color:var(--ink2);text-align:center}
+.dbar{height:16px;background:var(--card);border:1px solid var(--line);border-radius:2px;overflow:hidden}
+.dfill{height:100%}
+.dfill.t-dry{background:var(--dry)} .dfill.t-ok{background:var(--ok)} .dfill.t-loose{background:var(--loose)}
+.dp{font:500 12px var(--mono);color:var(--ink2);text-align:right;font-variant-numeric:tabular-nums}
+
+/* --- czat --- */
+#chat-log{min-height:200px;max-height:52vh;overflow-y:auto;padding:4px 0 10px}
+.msg{padding:11px 13px;border-radius:var(--r);margin-bottom:9px;font-size:14.5px;line-height:1.5}
+.msg.user{background:var(--deep);color:#fff;margin-left:14%}
+.msg.assistant{background:var(--card);border:1px solid var(--line);margin-right:6%}
+.chatbar{display:flex;gap:8px;align-items:flex-end;position:sticky;bottom:0;
+  background:var(--paper);padding:10px 0;border-top:1px solid var(--line)}
+.chatbar textarea{min-height:42px;max-height:110px}
+.chatbar button{flex:none;background:var(--deep);color:#fff;border:none;
+  border-radius:var(--r);padding:0 17px;height:42px;font-weight:600;cursor:pointer}
+.disclaim{font-size:11.5px;color:var(--ink2);line-height:1.45;margin:10px 0 0;
+  padding-left:9px;border-left:2px solid var(--line)}
+
+/* --- toast --- */
+#toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,14px);
+  background:var(--ink);color:#fff;padding:11px 19px;border-radius:var(--r);
+  font-size:14px;opacity:0;pointer-events:none;transition:.2s;z-index:50}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+
+.cklist{background:#FBEFEE;border:1px solid var(--signal);border-radius:var(--r);
+  padding:12px 14px;margin:11px 0}
+.ckhead{font:600 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--signal);margin-bottom:8px}
+.cklist ul{margin:0;padding-left:17px}
+.cklist li{font-size:13px;line-height:1.55;color:var(--ink)}
+.two .btn{margin-top:14px}
+</style>
+</head>
+<body>
+
+<header>
+  <button id="backbtn" aria-label="Back">&#8592;</button>
+  <span class="brand">Health Record</span>
+</header>
+
+<div class="wrap">
+
+<!-- HUB -->
+<section id="s-hub" class="screen">
+  <div class="hubstat" id="hub-stat"></div>
+  <p id="hub-msg"></p>
+  <div class="tiles">
+    <button class="tile" data-go="log">
+      <span class="tilen">01</span>
+      <span class="tilet">Log</span>
+      <span class="tiled">Stool, meals, weight — your daily entries</span>
+    </button>
+    <button class="tile" data-go="trends">
+      <span class="tilen">02</span>
+      <span class="tilet">Review</span>
+      <span class="tiled">Trends, charts, correlation analysis</span>
+    </button>
+    <button class="tile" data-go="chat">
+      <span class="tilen">03</span>
+      <span class="tilet">Ask about your data</span>
+      <span class="tiled">Talk through your history</span>
+    </button>
+  </div>
+  <div class="minor">
+    <button data-go="labs">Blood work</button>
+    <button data-go="supps">Supplements</button>
+    <button data-go="settings">Settings</button>
+  </div>
+</section>
+
+<!-- LOG -->
+<section id="s-log" class="screen">
+  <h2>Stool</h2>
+  <p class="sub">Pick the type that fits best.</p>
+  <div id="bristol-list"></div>
+
+  <label>Urgency</label><div class="pills" id="opt-urgency"></div>
+  <label>Paper used</label><div class="pills" id="opt-paper"></div>
+  <label>Color</label><div class="pills" id="opt-color"></div>
+
+  <label class="check"><input type="checkbox" id="chk-blood"> Blood in stool</label>
+  <label class="check"><input type="checkbox" id="chk-pain"> Pain wakes me at night</label>
+
+  <div id="redflags" style="display:none"></div>
+
+  <label for="stool-time">When</label>
+  <input type="datetime-local" id="stool-time">
+  <label for="stool-note">Note</label>
+  <textarea id="stool-note" placeholder="bloating, smell, floated..."></textarea>
+  <button class="btn" data-act="saveStool">Save stool</button>
+
+  <h3>Meal</h3>
+  <input type="text" id="meal-input" placeholder="Type an item and press Enter">
+  <div id="meal-chips"></div>
+  <div class="pills" id="meal-recent"></div>
+  <label for="meal-time">When</label>
+  <input type="datetime-local" id="meal-time">
+  <button class="btn ghost" data-act="saveMeal">Save meal</button>
+
+  <h3>Measurements</h3>
+  <div id="metric-list"></div>
+  <div class="two">
+    <select id="metric-select"></select>
+    <input type="number" step="0.1" id="metric-value" placeholder="value">
+  </div>
+  <input type="datetime-local" id="metric-time">
+  <button class="btn ghost" data-act="saveMetric">Save measurement</button>
+  <button class="mini" data-act="addCustom" style="margin-top:10px">+ custom measurement</button>
+</section>
+
+<!-- LABS -->
+<section id="s-labs" class="screen">
+  <h2>Blood work</h2>
+  <p class="sub">Photo of a report, or enter values by hand.</p>
+
+  <h3>From a photo</h3>
+  <input type="file" id="photo-input" accept="image/*">
+  <div id="mask-wrap" style="display:none">
+    <canvas id="mask-canvas"></canvas>
+    <p id="photo-step"></p>
+    <div id="mask-checklist" style="display:none">
+      <div class="cklist">
+        <div class="ckhead">Black these out before sending</div>
+        <ul>
+          <li>Name and date of birth</li>
+          <li>Barcode &mdash; it encodes your patient ID</li>
+          <li>Accession number / MRN / insurance ID</li>
+          <li>Footer &mdash; your name often repeats at the bottom</li>
+          <li>Ordering physician name</li>
+        </ul>
+      </div>
+    </div>
+    <div class="two">
+      <button class="btn ghost" data-act="resetMask">Clear mask</button>
+      <button class="btn" data-act="extract">Read results</button>
+    </div>
+  </div>
+  <div id="extracted"></div>
+  <div id="ex-actions" style="display:none">
+    <div class="two">
+      <div><label for="ex-date">Collection date</label><input type="date" id="ex-date"></div>
+      <div><label for="ex-lab">Lab</label><input type="text" id="ex-lab" placeholder="quest"></div>
+    </div>
+    <button class="btn" data-act="saveEx">Save selected</button>
+  </div>
+
+  <h3>By hand</h3>
+  <label for="lab-analyte">Analyte</label>
+  <select id="lab-analyte"></select>
+  <p class="muted" id="lab-note" style="font-size:12.5px;margin:6px 0 0"></p>
+  <div class="two">
+    <div><label for="lab-value">Result</label><input type="number" step="any" id="lab-value"></div>
+    <div><label for="lab-unit">Unit</label><select id="lab-unit"></select></div>
+  </div>
+  <div class="two">
+    <div><label for="lab-reflow">Range low</label><input type="number" step="any" id="lab-reflow"></div>
+    <div><label for="lab-refhigh">Range high</label><input type="number" step="any" id="lab-refhigh"></div>
+  </div>
+  <div class="two">
+    <div><label for="lab-date">Date</label><input type="date" id="lab-date"></div>
+    <div><label for="lab-lab">Lab</label><input type="text" id="lab-lab"></div>
+  </div>
+  <label for="lab-fasting">Fasting</label>
+  <select id="lab-fasting"><option value="">unknown</option><option value="1">yes</option><option value="0">no</option></select>
+  <div id="lab-warn" class="disclaim"></div>
+  <button class="btn" data-act="saveLab">Save result</button>
+
+  <h3>History</h3>
+  <div id="lab-list"></div>
+</section>
+
+<!-- SUPPLEMENTS -->
+<section id="s-supps" class="screen">
+  <h2>Supplements</h2>
+  <p class="sub">Some of these skew lab results. That is why we track them.</p>
+  <label for="supp-select">Supplement</label>
+  <select id="supp-select"></select>
+  <div class="two">
+    <div><label for="supp-dose">Dose</label><input type="number" step="any" id="supp-dose"></div>
+    <div><label for="supp-start">Started</label><input type="date" id="supp-start"></div>
+  </div>
+  <button class="btn" data-act="addSupp">Add</button>
+  <h3>Active</h3><div id="supp-active"></div>
+  <h3>Stopped</h3><div id="supp-past"></div>
+</section>
+
+<!-- TRENDS -->
+<section id="s-trends" class="screen">
+  <h2>Review</h2>
+  <p class="sub">What the data shows — and what it does not show yet.</p>
+  <div id="trend-body"></div>
+</section>
+
+<!-- CHAT -->
+<section id="s-chat" class="screen">
+  <h2>Ask about your data</h2>
+  <div id="chat-log"></div>
+  <div class="chatbar">
+    <textarea id="chat-input" placeholder="e.g. What is happening with my ferritin?"></textarea>
+    <button data-act="send">Send</button>
+  </div>
+  <p class="disclaim">Only numbers are sent: an age band, sex, results, and time offsets in months.
+  No name, no exact dates, no lab names. This is not medical advice or a diagnosis.</p>
+</section>
+
+<!-- SETTINGS -->
+<section id="s-settings" class="screen">
+  <h2>Settings</h2>
+  <label for="set-endpoint">Cloudflare Worker URL</label>
+  <input type="url" id="set-endpoint" placeholder="https://...workers.dev">
+  <p class="disclaim">Your API key stays in the Worker, never in this file.</p>
+  <div class="two">
+    <div><label for="set-age">Age</label><input type="number" id="set-age"></div>
+    <div><label for="set-sex">Sex</label><select id="set-sex"><option value="M">Male</option><option value="F">Female</option></select></div>
+  </div>
+  <button class="btn" data-act="saveSettings">Save</button>
+
+  <h3>Backup</h3>
+  <p class="muted">Your data lives only in this browser. Clearing site data deletes it.
+  Export a copy regularly.</p>
+  <button class="btn ghost" data-act="export">Download backup</button>
+  <label for="import-input">Restore from backup</label>
+  <input type="file" id="import-input" accept="application/json">
+</section>
+
+</div>
+<div id="toast"></div>
+
+<script>/* ============================================================
+   ANALYTE CATALOG
+   Canonical unit = SI. Each analyte knows its unit variants
+   and the multiplier to canonical form.
+
+   Rule: NEVER convert a lab's reference range into some other
+   range. Only the VALUE and that same lab's range are converted,
+   together, by the same multiplier.
+   ============================================================ */
+
+var ANALYTES = {
+
+  /* --- CBC --- */
+  hgb: {
+    label: 'Hemoglobin', labelPl: 'Hemoglobina', group: 'CBC',
+    si: 'g/L', units: { 'g/L': 1, 'g/dL': 10, 'mmol/L': 16.114 },
+    typical: { M: [135, 175], F: [120, 155] }, higherIsBetter: null
+  },
+  hct: {
+    label: 'Hematocrit', labelPl: 'Hematokryt', group: 'CBC',
+    si: 'L/L', units: { 'L/L': 1, '%': 0.01 },
+    typical: { M: [0.40, 0.52], F: [0.36, 0.47] }
+  },
+  rbc: {
+    label: 'RBC', labelPl: 'Erytrocyty', group: 'CBC',
+    si: '10^12/L', units: { '10^12/L': 1, '10^6/uL': 1, 'M/uL': 1 },
+    typical: { M: [4.5, 5.9], F: [4.0, 5.2] }
+  },
+  wbc: {
+    label: 'WBC', labelPl: 'Leukocyty', group: 'CBC',
+    si: '10^9/L', units: { '10^9/L': 1, '10^3/uL': 1, 'K/uL': 1 },
+    typical: { any: [4.0, 11.0] }
+  },
+  plt: {
+    label: 'Platelets', labelPl: 'Płytki krwi', group: 'CBC',
+    si: '10^9/L', units: { '10^9/L': 1, '10^3/uL': 1, 'K/uL': 1 },
+    typical: { any: [150, 400] }
+  },
+  mcv: {
+    label: 'MCV', labelPl: 'MCV', group: 'CBC',
+    si: 'fL', units: { 'fL': 1, 'um^3': 1 },
+    typical: { any: [80, 100] }
+  },
+
+  /* --- Iron studies --- */
+  ferritin: {
+    label: 'Ferritin', labelPl: 'Ferrytyna', group: 'iron',
+    si: 'ug/L', units: { 'ug/L': 1, 'ng/mL': 1 },
+    typical: { M: [30, 400], F: [15, 200] },
+    note: 'Acute-phase protein — rises with inflammation regardless of iron stores. Read alongside CRP.'
+  },
+  iron: {
+    label: 'Iron', labelPl: 'Żelazo', group: 'iron',
+    si: 'umol/L', units: { 'umol/L': 1, 'ug/dL': 0.1791 },
+    typical: { any: [10.7, 28.6] },
+    note: 'Strong diurnal and post-meal variation. A single measurement means little.'
+  },
+  transferrin_sat: {
+    label: 'Transferrin sat.', labelPl: 'Wysycenie transferyny', group: 'iron',
+    si: '%', units: { '%': 1 },
+    typical: { any: [20, 50] }
+  },
+
+  /* --- Lipids --- */
+  chol_total: {
+    label: 'Total cholesterol', labelPl: 'Cholesterol całkowity', group: 'lipids',
+    si: 'mmol/L', units: { 'mmol/L': 1, 'mg/dL': 0.02586 },
+    typical: { any: [0, 5.0] }, higherIsBetter: false
+  },
+  ldl: {
+    label: 'LDL', labelPl: 'LDL', group: 'lipids',
+    si: 'mmol/L', units: { 'mmol/L': 1, 'mg/dL': 0.02586 },
+    typical: { any: [0, 3.0] }, higherIsBetter: false
+  },
+  hdl: {
+    label: 'HDL', labelPl: 'HDL', group: 'lipids',
+    si: 'mmol/L', units: { 'mmol/L': 1, 'mg/dL': 0.02586 },
+    typical: { M: [1.0, 3.0], F: [1.3, 3.0] }, higherIsBetter: true
+  },
+  triglycerides: {
+    label: 'Triglycerides', labelPl: 'Trójglicerydy', group: 'lipids',
+    si: 'mmol/L', units: { 'mmol/L': 1, 'mg/dL': 0.01129 },
+    typical: { any: [0, 1.7] }, higherIsBetter: false,
+    note: 'Requires a 9-12h fast. A non-fasting result is not comparable.'
+  },
+
+  /* --- Glycemic --- */
+  glucose: {
+    label: 'Glucose', labelPl: 'Glukoza', group: 'metabolic',
+    si: 'mmol/L', units: { 'mmol/L': 1, 'mg/dL': 0.05551 },
+    typical: { any: [3.9, 5.5] },
+    note: 'Fasting only. A post-meal result is not comparable.'
+  },
+  hba1c: {
+    label: 'HbA1c', labelPl: 'HbA1c', group: 'metabolic',
+    si: 'mmol/mol', units: { 'mmol/mol': 1, '%': 'NGSP' },
+    typical: { any: [20, 39] }, higherIsBetter: false
+  },
+  insulin: {
+    label: 'Insulin', labelPl: 'Insulina', group: 'metabolic',
+    si: 'pmol/L', units: { 'pmol/L': 1, 'uIU/mL': 6.945, 'mIU/L': 6.945 },
+    typical: { any: [17, 173] }
+  },
+
+  /* --- Liver --- */
+  alt: {
+    label: 'ALT', labelPl: 'ALT', group: 'liver',
+    si: 'U/L', units: { 'U/L': 1, 'IU/L': 1 },
+    typical: { M: [0, 41], F: [0, 33] }, higherIsBetter: false
+  },
+  ast: {
+    label: 'AST', labelPl: 'AST', group: 'liver',
+    si: 'U/L', units: { 'U/L': 1, 'IU/L': 1 },
+    typical: { M: [0, 40], F: [0, 32] }, higherIsBetter: false
+  },
+  ggt: {
+    label: 'GGT', labelPl: 'GGTP', group: 'liver',
+    si: 'U/L', units: { 'U/L': 1, 'IU/L': 1 },
+    typical: { M: [0, 60], F: [0, 40] }, higherIsBetter: false
+  },
+  bilirubin_total: {
+    label: 'Total bilirubin', labelPl: 'Bilirubina całkowita', group: 'liver',
+    si: 'umol/L', units: { 'umol/L': 1, 'mg/dL': 17.104 }
+  },
+  albumin: {
+    label: 'Albumin', labelPl: 'Albumina', group: 'liver',
+    si: 'g/L', units: { 'g/L': 1, 'g/dL': 10 },
+    typical: { any: [35, 52] }
+  },
+
+  /* --- Kidney --- */
+  creatinine: {
+    label: 'Creatinine', labelPl: 'Kreatynina', group: 'kidney',
+    si: 'umol/L', units: { 'umol/L': 1, 'mg/dL': 88.4 },
+    typical: { M: [62, 106], F: [44, 80] },
+    note: 'Depends on muscle mass. Often elevated in people who lift, with no pathology.'
+  },
+  urea: {
+    label: 'Urea', labelPl: 'Mocznik', group: 'kidney',
+    si: 'mmol/L', units: { 'mmol/L': 1, 'mg/dL': 0.1665, 'BUN mg/dL': 0.357 },
+    typical: { any: [2.5, 7.5] },
+    note: 'CAUTION: US labs report BUN (urea nitrogen), EU labs report urea. NOT the same — factor of 2.14.'
+  },
+  egfr: {
+    label: 'eGFR', labelPl: 'eGFR', group: 'kidney',
+    si: 'mL/min/1.73m2', units: { 'mL/min/1.73m2': 1 },
+    typical: { any: [90, 200] }, higherIsBetter: true
+  },
+  uric_acid: {
+    label: 'Uric acid', labelPl: 'Kwas moczowy', group: 'kidney',
+    si: 'umol/L', units: { 'umol/L': 1, 'mg/dL': 59.48 },
+    typical: { M: [200, 420], F: [140, 360] }
+  },
+
+  /* --- Thyroid --- */
+  tsh: {
+    label: 'TSH', labelPl: 'TSH', group: 'thyroid',
+    si: 'mIU/L', units: { 'mIU/L': 1, 'uIU/mL': 1 },
+    typical: { any: [0.4, 4.0] },
+    note: 'Up to 50% diurnal variation. Only compare draws from a similar time of day.'
+  },
+  ft4: {
+    label: 'Free T4', labelPl: 'FT4', group: 'thyroid',
+    si: 'pmol/L', units: { 'pmol/L': 1, 'ng/dL': 12.87, 'ng/L': 1.287 },
+    typical: { any: [12, 22] }
+  },
+  ft3: {
+    label: 'Free T3', labelPl: 'FT3', group: 'thyroid',
+    si: 'pmol/L', units: { 'pmol/L': 1, 'pg/mL': 1.536 },
+    typical: { any: [3.1, 6.8] }
+  },
+
+  /* --- Vitamins & minerals --- */
+  vit_d: {
+    label: 'Vitamin D 25-OH', labelPl: 'Witamina D 25(OH)', group: 'vitamins',
+    si: 'nmol/L', units: { 'nmol/L': 1, 'ng/mL': 2.496 },
+    typical: { any: [75, 125] }, higherIsBetter: null
+  },
+  vit_b12: {
+    label: 'Vitamin B12', labelPl: 'Witamina B12', group: 'vitamins',
+    si: 'pmol/L', units: { 'pmol/L': 1, 'pg/mL': 0.7378, 'ng/L': 0.7378 },
+    typical: { any: [148, 660] }
+  },
+  folate: {
+    label: 'Folate', labelPl: 'Kwas foliowy', group: 'vitamins',
+    si: 'nmol/L', units: { 'nmol/L': 1, 'ng/mL': 2.266 },
+    typical: { any: [7, 45] }
+  },
+  magnesium: {
+    label: 'Magnesium', labelPl: 'Magnez', group: 'vitamins',
+    si: 'mmol/L', units: { 'mmol/L': 1, 'mg/dL': 0.4114, 'mEq/L': 0.5 },
+    typical: { any: [0.66, 1.07] }
+  },
+  calcium: {
+    label: 'Calcium', labelPl: 'Wapń', group: 'vitamins',
+    si: 'mmol/L', units: { 'mmol/L': 1, 'mg/dL': 0.2495, 'mEq/L': 0.5 },
+    typical: { any: [2.15, 2.55] }
+  },
+
+  /* --- Electrolytes --- */
+  sodium: {
+    label: 'Sodium', labelPl: 'Sód', group: 'electrolytes',
+    si: 'mmol/L', units: { 'mmol/L': 1, 'mEq/L': 1 },
+    typical: { any: [135, 145] }
+  },
+  potassium: {
+    label: 'Potassium', labelPl: 'Potas', group: 'electrolytes',
+    si: 'mmol/L', units: { 'mmol/L': 1, 'mEq/L': 1 },
+    typical: { any: [3.5, 5.1] }
+  },
+
+  /* --- Inflammation / hormones --- */
+  crp: {
+    label: 'CRP', labelPl: 'CRP', group: 'inflammation',
+    si: 'mg/L', units: { 'mg/L': 1, 'mg/dL': 10 },
+    typical: { any: [0, 5] }, higherIsBetter: false
+  },
+  testosterone_total: {
+    label: 'Total testosterone', labelPl: 'Testosteron całkowity', group: 'hormones',
+    si: 'nmol/L', units: { 'nmol/L': 1, 'ng/dL': 0.03467, 'ng/mL': 3.467 },
+    typical: { M: [8.6, 29.0], F: [0.3, 2.4] },
+    note: 'Draw in the morning (7-10am). An afternoon draw can read up to 25% lower.'
+  },
+  cortisol: {
+    label: 'Cortisol', labelPl: 'Kortyzol', group: 'hormones',
+    si: 'nmol/L', units: { 'nmol/L': 1, 'ug/dL': 27.59 },
+    typical: { any: [140, 690] },
+    note: 'Extreme diurnal variation. Without a draw time the result is meaningless.'
+  },
+
+  /* --- Stool / gut --- */
+  calprotectin: {
+    label: 'Fecal calprotectin', labelPl: 'Kalprotektyna w kale', group: 'gut',
+    si: 'ug/g', units: { 'ug/g': 1, 'mg/kg': 1 },
+    typical: { any: [0, 50] }, higherIsBetter: false,
+    note: 'Marker of intestinal inflammation. Distinguishes IBS from IBD.'
+  }
+};
+
+/* Analytes where time of draw changes interpretation */
+var TIME_SENSITIVE = ['cortisol', 'testosterone_total', 'tsh', 'iron'];
+
+/* Analytes requiring a fast */
+var FASTING_REQUIRED = ['glucose', 'triglycerides', 'insulin', 'ldl', 'chol_total'];
+
+/* ---------------------------------------- */
+
+/* ============================================================
+   SUPPLEMENTS
+
+   The main reason to track these is NOT "what helps".
+   The main reason: some supplements SKEW LAB RESULTS.
+   An "out of range" value in someone taking biotin may be an
+   assay artifact, not disease. Without this layer the app would
+   raise a false alarm and send you for needless workup.
+
+   interferes: [{ analyte, direction, threshold, washoutHours, why }]
+     direction: 'up' | 'down'  = WHICH WAY the RESULT is shifted
+                (not: which way health is affected)
+   ============================================================ */
+
+var SUPPLEMENTS = {
+
+  biotin: {
+    label: 'Biotin (B7)', unit: 'mg', group: 'vitamins',
+    interferes: [
+      { analyte: 'tsh', direction: 'down', threshold: 5, washoutHours: 72,
+        why: 'High-dose biotin interferes with immunoassays. TSH reads falsely low and FT4 falsely high — mimicking hyperthyroidism that is not there.' },
+      { analyte: 'ft4', direction: 'up', threshold: 5, washoutHours: 72,
+        why: 'Same mechanism as with TSH.' },
+      { analyte: 'ft3', direction: 'up', threshold: 5, washoutHours: 72,
+        why: 'Same mechanism as with TSH.' }
+    ],
+    note: 'Stop at least 72h before thyroid testing. Biotin is often hidden in hair-and-nail supplements at 5-10 mg.'
+  },
+
+  creatine: {
+    label: 'Creatine', unit: 'g', group: 'sport',
+    interferes: [
+      { analyte: 'creatinine', direction: 'up', threshold: 3, washoutHours: 336,
+        why: 'Creatine breaks down into creatinine. A 10-20% rise is expected and does NOT indicate kidney damage.' },
+      { analyte: 'egfr', direction: 'down', threshold: 3, washoutHours: 336,
+        why: 'eGFR is calculated from creatinine, so it drops automatically. A calculation artifact, not declining kidney function.' }
+    ],
+    note: 'If creatinine is elevated while on creatine: cystatin C is a marker independent of muscle mass.'
+  },
+
+  vit_d3: {
+    label: 'Vitamin D3', unit: 'IU', group: 'vitamins',
+    interferes: [
+      { analyte: 'vit_d', direction: 'up', threshold: 1000, washoutHours: 0,
+        why: 'Directly raises the measured level — that is the point, not an artifact.' },
+      { analyte: 'calcium', direction: 'up', threshold: 4000, washoutHours: 0,
+        why: 'Above 4000 IU long term, worth monitoring calcium.' }
+    ]
+  },
+
+  vit_b12: {
+    label: 'Vitamin B12', unit: 'ug', group: 'vitamins',
+    interferes: [
+      { analyte: 'vit_b12', direction: 'up', threshold: 100, washoutHours: 2160,
+        why: 'Raises the result for months. A normal level while supplementing does NOT rule out an absorption problem — that needs homocysteine or MMA.' }
+    ]
+  },
+
+  iron: {
+    label: 'Iron', unit: 'mg', group: 'minerals',
+    interferes: [
+      { analyte: 'iron', direction: 'up', threshold: 15, washoutHours: 24,
+        why: 'Serum iron spikes for many hours after a dose. A same-day draw bears no relation to stores.' },
+      { analyte: 'transferrin_sat', direction: 'up', threshold: 15, washoutHours: 24,
+        why: 'Calculated from serum iron, so it inherits the same artifact.' }
+    ],
+    note: 'Ferritin is resistant to this effect — a better marker of stores.'
+  },
+
+  ashwagandha: {
+    label: 'Ashwagandha', unit: 'mg', group: 'adaptogens',
+    interferes: [
+      { analyte: 'tsh', direction: 'down', threshold: 300, washoutHours: 336,
+        why: 'May genuinely stimulate the thyroid — not an assay artifact but a real physiological effect. The result is true, but the supplement is the cause.' },
+      { analyte: 'ft4', direction: 'up', threshold: 300, washoutHours: 336 },
+      { analyte: 'alt', direction: 'up', threshold: 300, washoutHours: 720,
+        why: 'Rare cases of liver injury are reported. If ALT/AST rises while on ashwagandha, it is the first thing to stop.' }
+    ]
+  },
+
+  niacin: {
+    label: 'Niacin (B3)', unit: 'mg', group: 'vitamins',
+    interferes: [
+      { analyte: 'glucose', direction: 'up', threshold: 500, washoutHours: 168,
+        why: 'High doses worsen insulin sensitivity.' },
+      { analyte: 'uric_acid', direction: 'up', threshold: 500, washoutHours: 168 },
+      { analyte: 'alt', direction: 'up', threshold: 1000, washoutHours: 336 }
+    ]
+  },
+
+  red_yeast_rice: {
+    label: 'Red yeast rice', unit: 'mg', group: 'other',
+    interferes: [
+      { analyte: 'ldl', direction: 'down', threshold: 600, washoutHours: 720,
+        why: 'Contains monacolin K, chemically identical to lovastatin. It is effectively a statin sold as a supplement.' },
+      { analyte: 'alt', direction: 'up', threshold: 600, washoutHours: 720 }
+    ],
+    note: 'Do not combine with a prescription statin without your doctor knowing — that is a double dose of the same mechanism.'
+  },
+
+  zinc: {
+    label: 'Zinc', unit: 'mg', group: 'minerals',
+    interferes: [
+      { analyte: 'hgb', direction: 'down', threshold: 40, washoutHours: 2160,
+        why: 'Prolonged high-dose use depletes copper, causing anemia that does not respond to iron.' }
+    ],
+    note: 'Above 40 mg/day long term — worth monitoring copper.'
+  },
+
+  omega3: {
+    label: 'Omega-3 (EPA/DHA)', unit: 'mg', group: 'fats',
+    interferes: [
+      { analyte: 'triglycerides', direction: 'down', threshold: 2000, washoutHours: 0,
+        why: 'A real reduction, and the expected effect.' }
+    ]
+  },
+
+  magnesium: {
+    label: 'Magnesium', unit: 'mg', group: 'minerals',
+    interferes: [
+      { analyte: 'magnesium', direction: 'up', threshold: 200, washoutHours: 24 }
+    ],
+    note: 'Serum magnesium is <1% of body stores — a normal result does not rule out deficiency.'
+  },
+
+  vit_c: {
+    label: 'Vitamin C', unit: 'mg', group: 'vitamins',
+    interferes: [
+      { analyte: 'glucose', direction: 'down', threshold: 1000, washoutHours: 24,
+        why: 'Interferes with some strip glucometers (not with lab assays).' }
+    ],
+    note: 'Can cause a false negative on fecal occult blood tests. Stop 3 days before.'
+  },
+
+  vit_k2: {
+    label: 'Vitamin K2', unit: 'ug', group: 'vitamins',
+    interferes: [],
+    note: 'No effect on standard labs. CAUTION with warfarin — it counteracts the drug.'
+  },
+
+  /* No documented lab interference */
+  lions_mane: { label: 'Lion\'s Mane', unit: 'mg', group: 'mushrooms', interferes: [] },
+  rhodiola:   { label: 'Rhodiola', unit: 'mg', group: 'adaptogens', interferes: [] },
+  l_theanine: { label: 'L-theanine', unit: 'mg', group: 'amino acids', interferes: [] },
+  melatonin:  { label: 'Melatonin', unit: 'mg', group: 'other', interferes: [] },
+  whey:       { label: 'Whey protein', unit: 'g', group: 'sport',
+    interferes: [{ analyte: 'urea', direction: 'up', threshold: 60, washoutHours: 48,
+      why: 'High protein intake raises urea with no kidney pathology.' }] }
+};
+
+/* ---------------------------------------- */
+
+/* ============================================================
+   HEALTH CORE — data layer
+   Vanilla JS, var only (Safari), no dependencies.
+   ============================================================ */
+
+
+
+var SCHEMA_VERSION = 1;
+
+/* ------------------------------------------------------------
+   1. UNIT CONVERSION
+   ------------------------------------------------------------ */
+
+function toSI(analyteKey, value, unit) {
+  var a = ANALYTES[analyteKey];
+  if (!a) return { ok: false, error: 'Unknown analyte: ' + analyteKey };
+  if (value === null || value === undefined || isNaN(value)) {
+    return { ok: false, error: 'Value is not a number' };
+  }
+
+  // HbA1c: NGSP (%) <-> IFCC (mmol/mol) - linear relation, not a multiplier
+  if (analyteKey === 'hba1c' && unit === '%') {
+    return { ok: true, value: round((value - 2.15) * 10.929, 3), unit: 'mmol/mol' };
+  }
+
+  var factor = a.units[unit];
+  if (factor === undefined) {
+    return {
+      ok: false,
+      error: 'Unit "' + unit + '" is not valid for ' + a.label +
+             '. Available: ' + Object.keys(a.units).join(', ')
+    };
+  }
+  if (typeof factor !== 'number') {
+    return { ok: false, error: 'Unhandled special conversion: ' + unit };
+  }
+  return { ok: true, value: round(value * factor, 4), unit: a.si };
+}
+
+function fromSI(analyteKey, siValue, targetUnit) {
+  var a = ANALYTES[analyteKey];
+  if (!a) return null;
+  if (analyteKey === 'hba1c' && targetUnit === '%') {
+    return round(siValue / 10.929 + 2.15, 2);
+  }
+  var factor = a.units[targetUnit];
+  if (typeof factor !== 'number') return null;
+  return round(siValue / factor, 4);
+}
+
+function round(n, places) {
+  var m = Math.pow(10, places);
+  return Math.round(n * m) / m;
+}
+
+/* ------------------------------------------------------------
+   2. OBSERVATION MODEL
+
+   Key design decision: a lab's reference range is stored WITH
+   EVERY result and converted by the same multiplier as the value.
+   We never substitute "universal" ranges — different labs have
+   different ones, and that is information, not noise to smooth away.
+   ------------------------------------------------------------ */
+
+function createObservation(input) {
+  var errors = [];
+  var a = ANALYTES[input.analyte];
+  if (!a) return { ok: false, errors: ['Unknown analyte: ' + input.analyte] };
+
+  var conv = toSI(input.analyte, input.value, input.unit);
+  if (!conv.ok) return { ok: false, errors: [conv.error] };
+
+  var obs = {
+    v: SCHEMA_VERSION,
+    id: input.id || genId(),
+    analyte: input.analyte,
+    valueRaw: input.value,
+    unitRaw: input.unit,
+    value: conv.value,
+    unit: conv.unit,
+    collectedAt: input.collectedAt,          // ISO 8601
+    labId: input.labId || null,              // "quest", "labcorp", "diagnostyka"
+    fasting: input.fasting === undefined ? null : !!input.fasting,
+    refLow: null,
+    refHigh: null,
+    note: input.note || null
+  };
+
+  // Lab range -> same conversion as the value
+  if (input.refLow !== undefined && input.refLow !== null) {
+    var rl = toSI(input.analyte, input.refLow, input.unit);
+    if (rl.ok) obs.refLow = rl.value;
+  }
+  if (input.refHigh !== undefined && input.refHigh !== null) {
+    var rh = toSI(input.analyte, input.refHigh, input.unit);
+    if (rh.ok) obs.refHigh = rh.value;
+  }
+
+  // No lab range -> fall back to typical, but flag the source
+  obs.refSource = (obs.refLow !== null || obs.refHigh !== null) ? 'lab' : null;
+  if (!obs.refSource && a.typical) {
+    var t = a.typical[input.sex] || a.typical.any;
+    if (t) { obs.refLow = t[0]; obs.refHigh = t[1]; obs.refSource = 'typical'; }
+  }
+
+  // Contextual warnings - never block saving
+  var warnings = [];
+  if (FASTING_REQUIRED.indexOf(input.analyte) !== -1 && obs.fasting === false) {
+    warnings.push(a.label + ': non-fasting draw — not comparable with fasting results.');
+  }
+  if (FASTING_REQUIRED.indexOf(input.analyte) !== -1 && obs.fasting === null) {
+    warnings.push(a.label + ': fasting status not recorded. Add it, or the trend will mislead.');
+  }
+  if (TIME_SENSITIVE.indexOf(input.analyte) !== -1 && !hasTimeOfDay(input.collectedAt)) {
+    warnings.push(a.label + ': no draw time recorded. This analyte varies through the day — without a time the trend is unreliable.');
+  }
+  if (a.note) warnings.push(a.label + ': ' + a.note);
+
+  obs.warnings = warnings;
+  return { ok: true, obs: obs, errors: errors };
+}
+
+function hasTimeOfDay(iso) {
+  return typeof iso === 'string' && iso.indexOf('T') !== -1;
+}
+
+function genId() {
+  return 'o_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+/* ------------------------------------------------------------
+   3. TRENDS
+
+   We do not use "position within range" as the primary metric:
+   when the lab changes, the range changes and the position jumps
+   with no biological change at all. The primary metric is the SI
+   value. A change of lab is FLAGGED, not smoothed over.
+   ------------------------------------------------------------ */
+
+function buildSeries(observations, analyteKey) {
+  var pts = observations
+    .filter(function (o) { return o.analyte === analyteKey; })
+    .sort(function (x, y) { return new Date(x.collectedAt) - new Date(y.collectedAt); });
+
+  if (!pts.length) return null;
+
+  var labs = {};
+  var refPairs = {};
+  pts.forEach(function (p) {
+    if (p.labId) labs[p.labId] = true;
+    refPairs[p.refLow + '|' + p.refHigh] = true;
+  });
+
+  var flags = [];
+  if (Object.keys(labs).length > 1) {
+    flags.push('Results from different labs (' + Object.keys(labs).join(', ') +
+               '). Assay methods may differ — compare with caution.');
+  }
+  if (Object.keys(refPairs).length > 1) {
+    flags.push('Reference range changed during this series. The chart shows a band per point, not one shared band.');
+  }
+
+  var fastingMix = {};
+  pts.forEach(function (p) { fastingMix[String(p.fasting)] = true; });
+  if (FASTING_REQUIRED.indexOf(analyteKey) !== -1 && Object.keys(fastingMix).length > 1) {
+    flags.push('This series mixes fasting and non-fasting draws — the trend is not meaningful.');
+  }
+
+  var first = pts[0], last = pts[pts.length - 1];
+  var delta = last.value - first.value;
+  var pct = first.value !== 0 ? round((delta / first.value) * 100, 1) : null;
+  var months = round((new Date(last.collectedAt) - new Date(first.collectedAt)) / 2629800000, 1);
+
+  return {
+    analyte: analyteKey,
+    label: ANALYTES[analyteKey].label,
+    unit: ANALYTES[analyteKey].si,
+    points: pts.map(function (p) {
+      return {
+        t: p.collectedAt, v: p.value,
+        refLow: p.refLow, refHigh: p.refHigh,
+        refSource: p.refSource, lab: p.labId,
+        out: outOfRange(p)
+      };
+    }),
+    n: pts.length,
+    spanMonths: months,
+    delta: round(delta, 4),
+    deltaPct: pct,
+    direction: delta > 0 ? 'up' : (delta < 0 ? 'down' : 'flat'),
+    flags: flags
+  };
+}
+
+function outOfRange(o) {
+  if (o.refLow !== null && o.value < o.refLow) return 'low';
+  if (o.refHigh !== null && o.value > o.refHigh) return 'high';
+  return null;
+}
+
+/* Drift within range — the most commonly missed thing.
+   A value can sit "in range" the whole time while moving
+   steadily in one direction. Worth surfacing. */
+function driftWithinRange(series, minPoints) {
+  minPoints = minPoints || 3;
+  if (!series || series.n < minPoints) return null;
+  var allInRange = series.points.every(function (p) { return p.out === null; });
+  if (!allInRange) return null;
+
+  var mono = true, dir = null;
+  for (var i = 1; i < series.points.length; i++) {
+    var d = series.points[i].v - series.points[i - 1].v;
+    if (d === 0) continue;
+    var thisDir = d > 0 ? 'up' : 'down';
+    if (dir === null) dir = thisDir;
+    else if (dir !== thisDir) { mono = false; break; }
+  }
+  if (!mono || dir === null) return null;
+
+  return {
+    direction: dir,
+    deltaPct: series.deltaPct,
+    spanMonths: series.spanMonths,
+    message: series.label + ': every result in range, but a consistent trend ' +
+             (dir === 'up' ? 'upward' : 'downward') + ' of ' + Math.abs(series.deltaPct) +
+             '% over ' + series.spanMonths + ' months.'
+  };
+}
+
+/* ------------------------------------------------------------
+   4. EXPOSURE WINDOW — food -> stool
+
+   Transit time 24-72h. Weight decays with distance.
+   ------------------------------------------------------------ */
+
+var EXPOSURE_WINDOW = [
+  { hoursMin: 12, hoursMax: 36, weight: 1.0 },
+  { hoursMin: 36, hoursMax: 60, weight: 0.7 },
+  { hoursMin: 60, hoursMax: 84, weight: 0.4 }
+];
+
+function exposureWeight(mealTime, stoolTime) {
+  var h = (new Date(stoolTime) - new Date(mealTime)) / 3600000;
+  for (var i = 0; i < EXPOSURE_WINDOW.length; i++) {
+    var w = EXPOSURE_WINDOW[i];
+    if (h >= w.hoursMin && h < w.hoursMax) return w.weight;
+  }
+  return 0;
+}
+
+/* For each item: weighted frequency across "bad" vs "good"
+   stools. Returns CANDIDATES, not culprits. */
+function findCandidates(meals, stools, opts) {
+  opts = opts || {};
+  var badTypes = opts.badTypes || [1, 2, 6, 7];
+  var minExposures = opts.minExposures || 4;
+
+  var tally = {};
+  var ambient = { bad: 0, good: 0, peakBad: 0, peakGood: 0 };
+
+  stools.forEach(function (s) {
+    var isBad = badTypes.indexOf(s.bristol) !== -1;
+    meals.forEach(function (m) {
+      var w = exposureWeight(m.at, s.at);
+      if (w === 0) return;
+      var isPeak = w === EXPOSURE_WINDOW[0].weight;
+
+      // Baseline weighted by the same window structure as the
+      // candidates — otherwise we compare apples to oranges.
+      if (isBad) ambient.bad += w; else ambient.good += w;
+      if (isPeak) { if (isBad) ambient.peakBad += 1; else ambient.peakGood += 1; }
+
+      (m.items || []).forEach(function (item) {
+        if (!tally[item]) tally[item] = { bad: 0, good: 0, exposures: 0, peakBad: 0, peakGood: 0 };
+        tally[item].exposures += 1;
+        if (isBad) tally[item].bad += w; else tally[item].good += w;
+        if (isPeak) { if (isBad) tally[item].peakBad += 1; else tally[item].peakGood += 1; }
+      });
+    });
+  });
+
+  var ambientTotal = ambient.bad + ambient.good;
+  var baseline = ambientTotal ? round(ambient.bad / ambientTotal, 3) : null;
+  var peakTotal = ambient.peakBad + ambient.peakGood;
+  var peakBaseline = peakTotal ? round(ambient.peakBad / peakTotal, 3) : null;
+
+  var out = [];
+  Object.keys(tally).forEach(function (item) {
+    var t = tally[item];
+    var total = t.bad + t.good;
+    if (total === 0 || t.exposures < minExposures) return;
+
+    var badShare = round(t.bad / total, 3);
+    var pTotal = t.peakBad + t.peakGood;
+    var peakShare = pTotal ? round(t.peakBad / pTotal, 3) : null;
+
+    out.push({
+      item: item,
+      badShare: badShare,
+      lift: baseline ? round(badShare / baseline, 2) : null,
+      peakShare: peakShare,
+      peakLift: (peakShare !== null && peakBaseline) ? round(peakShare / peakBaseline, 2) : null,
+      exposures: t.exposures,
+      peakExposures: pTotal,
+      confidence: confidenceLabel(pTotal)
+    });
+  });
+
+  // Sort by peak-window signal strength, overall lift as tie-break.
+  out.sort(function (x, y) {
+    var a = (y.peakLift || y.lift || 0) - (x.peakLift || x.lift || 0);
+    return a !== 0 ? a : (y.lift || 0) - (x.lift || 0);
+  });
+
+  return {
+    candidates: out.slice(0, 8),
+    baseline: baseline,
+    peakBaseline: peakBaseline,
+    disclaimer: 'These are candidates to test, not causes. ' +
+                'With a single user, correlation proves nothing — ' +
+                'confirm by elimination and reintroduction.'
+  };
+}
+
+/* ------------------------------------------------------------
+   PERMUTATION TEST
+
+   With 8 items and random data, something always clears the
+   threshold. We shuffle stool outcomes and each time record the
+   HIGHEST lift across the whole set. If the observed lift sits
+   inside what chance produces, it is not a signal.
+
+   Using the maximum across permutations controls error for the
+   entire family of comparisons at once, with no separate
+   Bonferroni correction.
+   ------------------------------------------------------------ */
+
+/* Exposure matrix computed ONCE. Permutation only shuffles stool
+   outcomes, so times and weights never change. */
+function buildExposureIndex(meals, stools) {
+  var items = {}, idx = [];
+  var peakW = EXPOSURE_WINDOW[0].weight;
+
+  for (var k = 0; k < stools.length; k++) {
+    var contrib = {};
+    for (var mi = 0; mi < meals.length; mi++) {
+      var w = exposureWeight(meals[mi].at, stools[k].at);
+      if (w === 0) continue;
+      var list = meals[mi].items || [];
+      for (var ii = 0; ii < list.length; ii++) {
+        var it = list[ii];
+        if (items[it] === undefined) items[it] = Object.keys(items).length;
+        if (!contrib[it]) contrib[it] = { w: 0, peak: 0 };
+        contrib[it].w += w;
+        if (w === peakW) contrib[it].peak += 1;
+      }
+    }
+    idx.push(contrib);
+  }
+  return { index: idx, items: Object.keys(items) };
+}
+
+function scoreFromIndex(ex, outcomes, badTypes) {
+  var acc = {};
+  ex.items.forEach(function (it) {
+    acc[it] = { bad: 0, good: 0, peakBad: 0, peakGood: 0 };
+  });
+  var amb = { bad: 0, good: 0, peakBad: 0, peakGood: 0 };
+
+  for (var k = 0; k < ex.index.length; k++) {
+    var isBad = badTypes.indexOf(outcomes[k]) !== -1;
+    var c = ex.index[k];
+    for (var it in c) {
+      var e = c[it], a = acc[it];
+      if (isBad) { a.bad += e.w; a.peakBad += e.peak; }
+      else { a.good += e.w; a.peakGood += e.peak; }
+      if (isBad) { amb.bad += e.w; amb.peakBad += e.peak; }
+      else { amb.good += e.w; amb.peakGood += e.peak; }
+    }
+  }
+
+  var ambTot = amb.bad + amb.good;
+  var base = ambTot ? amb.bad / ambTot : 0;
+  var ambPeak = amb.peakBad + amb.peakGood;
+  var basePeak = ambPeak ? amb.peakBad / ambPeak : 0;
+
+  var out = {};
+  ex.items.forEach(function (it) {
+    var a = acc[it];
+    var tot = a.bad + a.good;
+    var pTot = a.peakBad + a.peakGood;
+    var lift = (tot && base) ? (a.bad / tot) / base : 0;
+    var peakLift = (pTot && basePeak) ? (a.peakBad / pTot) / basePeak : null;
+    out[it] = {
+      signal: peakLift !== null ? peakLift : lift,
+      lift: round(lift, 2),
+      peakLift: peakLift === null ? null : round(peakLift, 2),
+      peakExposures: pTot
+    };
+  });
+  return { scores: out, baseline: round(base, 3), peakBaseline: round(basePeak, 3) };
+}
+
+function permutationTest(meals, stools, opts) {
+  opts = opts || {};
+  var B = opts.permutations || 300;
+  var badTypes = opts.badTypes || [1, 2, 6, 7];
+  var alpha = opts.alpha === undefined ? 0.025 : opts.alpha;
+  var minPeak = opts.minPeakExposures === undefined ? 5 : opts.minPeakExposures;
+
+  var ex = buildExposureIndex(meals, stools);
+  if (!ex.items.length) return { all: [], significant: [], tested: 0, permutations: B };
+
+  var outcomes = stools.map(function (s) { return s.bristol; });
+  var obs = scoreFromIndex(ex, outcomes, badTypes);
+
+  // Only test items with enough exposures.
+  var tested = ex.items.filter(function (it) {
+    return obs.scores[it].peakExposures >= minPeak;
+  });
+  if (!tested.length) {
+    return { all: [], significant: [], tested: 0, permutations: B,
+             note: 'Not enough exposures to test anything yet. Keep logging.' };
+  }
+
+  var nullMax = new Array(B);
+  var shuf = outcomes.slice();
+  for (var b = 0; b < B; b++) {
+    for (var i = shuf.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = shuf[i]; shuf[i] = shuf[j]; shuf[j] = t;
+    }
+    var s = scoreFromIndex(ex, shuf, badTypes).scores;
+    var mx = 0;
+    for (var q = 0; q < tested.length; q++) {
+      var v = s[tested[q]].signal;
+      if (v > mx) mx = v;
+    }
+    nullMax[b] = mx;
+  }
+
+  var results = tested.map(function (it) {
+    var o = obs.scores[it];
+    var atLeast = 0;
+    for (var b2 = 0; b2 < B; b2++) if (nullMax[b2] >= o.signal) atLeast++;
+    return {
+      item: it,
+      lift: o.lift,
+      peakLift: o.peakLift,
+      peakExposures: o.peakExposures,
+      p: round((atLeast + 1) / (B + 1), 4),   // +1: p is never exactly 0
+      confidence: confidenceLabel(o.peakExposures)
+    };
+  }).sort(function (x, y) { return x.p - y.p; });
+
+  return {
+    all: results,
+    significant: results.filter(function (r) { return r.p < alpha; }),
+    baseline: obs.baseline,
+    tested: tested.length,
+    permutations: B,
+    alpha: alpha
+  };
+}
+
+function confidenceLabel(n) {
+  if (n < 10) return 'very low';
+  if (n < 25) return 'low';
+  if (n < 60) return 'moderate';
+  return 'decent';
+}
+
+function baselineBadShare(stools, badTypes) {
+  if (!stools.length) return null;
+  var bad = stools.filter(function (s) { return badTypes.indexOf(s.bristol) !== -1; }).length;
+  return round(bad / stools.length, 3);
+}
+
+/* A candidate only matters if it clearly stands out from baseline.
+   If 60% of your stools are "bad", every item scores 60% and that
+   means nothing — hence lift, not difference.
+
+   An item present in every meal has lift = 1.00 by definition and
+   is filtered out automatically. */
+function meaningfulCandidates(result, minLift, minPeakExposures) {
+  minLift = minLift === undefined ? 1.3 : minLift;
+  minPeakExposures = minPeakExposures === undefined ? 5 : minPeakExposures;
+  if (result.baseline === null) return [];
+  return result.candidates.filter(function (c) {
+    var signal = c.peakLift !== null ? c.peakLift : c.lift;
+    return signal !== null && signal >= minLift && c.peakExposures >= minPeakExposures;
+  });
+}
+
+/* ------------------------------------------------------------
+   5. RED FLAGS — hard rules, no AI
+
+   These conditions NEVER go to the model for an opinion.
+   The answer is always the same: see a doctor.
+   ------------------------------------------------------------ */
+
+var RED_FLAGS = [
+  { id: 'blood', test: function (s) { return s.blood === true; },
+    msg: 'Blood in stool. Contact a doctor.' },
+  { id: 'melena', test: function (s) { return s.color === 'black_tarry'; },
+    msg: 'Black tarry stool can mean upper GI bleeding. Contact a doctor promptly.' },
+  { id: 'pale', test: function (s) { return s.color === 'pale_clay'; },
+    msg: 'Pale or clay-colored stool needs medical assessment (biliary).' },
+  { id: 'night_pain', test: function (s) { return s.painWakesAtNight === true; },
+    msg: 'Pain that wakes you at night is a red flag. See a doctor.' }
+];
+
+function checkRedFlags(stool) {
+  return RED_FLAGS.filter(function (f) { return f.test(stool); })
+                  .map(function (f) { return { id: f.id, msg: f.msg }; });
+}
+
+function checkLabRedFlags(observations) {
+  var out = [];
+  observations.forEach(function (o) {
+    var r = outOfRange(o);
+    if (!r) return;
+    if (o.refSource === 'typical') return; // don't alarm on fallback ranges
+    var a = ANALYTES[o.analyte];
+    var margin = (o.refHigh - o.refLow);
+    var excess = r === 'high' ? (o.value - o.refHigh) / margin : (o.refLow - o.value) / margin;
+    out.push({
+      analyte: o.analyte,
+      label: a.label,
+      direction: r,
+      severity: excess > 0.5 ? 'marked' : 'borderline',
+      value: o.value,
+      unit: o.unit
+    });
+  });
+  return out;
+}
+
+/* ------------------------------------------------------------
+   6. AI PAYLOAD — the only thing that leaves the device
+
+   No name, date of birth, phone, lab name, or exact dates.
+   Age rounded to a 5-year band. Time as an offset in months
+   from the first measurement.
+   ------------------------------------------------------------ */
+
+var FORBIDDEN_KEYS = ['name', 'firstName', 'lastName', 'dob', 'birthDate',
+  'phone', 'email', 'address', 'ssn', 'insuranceId', 'mrn', 'patientId', 'photo'];
+
+function buildAIPayload(profile, observations, stools, meals) {
+  var series = {};
+  var analytes = {};
+  observations.forEach(function (o) { analytes[o.analyte] = true; });
+
+  Object.keys(analytes).forEach(function (k) {
+    var s = buildSeries(observations, k);
+    if (!s) return;
+    var t0 = new Date(s.points[0].t);
+    series[k] = {
+      unit: s.unit,
+      values: s.points.map(function (p) { return p.v; }),
+      monthsFromFirst: s.points.map(function (p) {
+        return round((new Date(p.t) - t0) / 2629800000, 1);
+      }),
+      ref: s.points.map(function (p) { return [p.refLow, p.refHigh]; }),
+      refSource: s.points.map(function (p) { return p.refSource; }),
+      flags: s.flags
+    };
+  });
+
+  var payload = {
+    v: SCHEMA_VERSION,
+    ageBand: bandAge(profile.age),
+    sex: profile.sex || null,
+    labs: series,
+    stoolSummary: summarizeStools(stools),
+    recentCandidates: meals && stools ? findCandidates(meals, stools).candidates.slice(0, 5) : []
+  };
+
+  var leak = scanForPII(payload);
+  if (leak.length) {
+    throw new Error('Payload contains identifying data: ' + leak.join(', '));
+  }
+  return payload;
+}
+
+function bandAge(age) {
+  if (typeof age !== 'number') return null;
+  var lo = Math.floor(age / 5) * 5;
+  return lo + '-' + (lo + 4);
+}
+
+function summarizeStools(stools) {
+  if (!stools || !stools.length) return null;
+  var dist = {};
+  for (var i = 1; i <= 7; i++) dist[i] = 0;
+  stools.forEach(function (s) { if (dist[s.bristol] !== undefined) dist[s.bristol]++; });
+  return {
+    n: stools.length,
+    bristolDistribution: dist,
+    spanDays: round((new Date(stools[stools.length - 1].at) - new Date(stools[0].at)) / 86400000, 0)
+  };
+}
+
+function scanForPII(obj, path) {
+  path = path || '';
+  var found = [];
+  if (obj === null || typeof obj !== 'object') return found;
+  Object.keys(obj).forEach(function (k) {
+    if (FORBIDDEN_KEYS.indexOf(k) !== -1) found.push(path + k);
+    found = found.concat(scanForPII(obj[k], path + k + '.'));
+  });
+  return found;
+}
+
+/* ------------------------------------------------------------
+   7. EXPORT / IMPORT
+   ------------------------------------------------------------ */
+
+function exportAll(store) {
+  return JSON.stringify({
+    schemaVersion: SCHEMA_VERSION,
+    exportedAt: new Date().toISOString(),
+    app: 'health-core',
+    data: store
+  }, null, 2);
+}
+
+function importAll(json) {
+  var parsed = JSON.parse(json);
+  if (!parsed.schemaVersion) throw new Error('File has no schema version — refusing to import.');
+  if (parsed.schemaVersion > SCHEMA_VERSION) {
+    throw new Error('File is from a newer app version (v' + parsed.schemaVersion +
+                    '). Update the app before importing.');
+  }
+  return migrate(parsed.data, parsed.schemaVersion);
+}
+
+function migrate(data, fromVersion) {
+  // v1 -> no migration. Placeholder for future steps.
+  return data;
+}
+
+/* ---------------------------------------- */
+
+/* ============================================================
+   SUPPLEMENT LAYER + AI CONTRACT
+   Extension of core.js
+   ============================================================ */
+
+
+/* ------------------------------------------------------------
+   MODEL: a supplement course has a start and (optionally) an end.
+   Without dates you cannot tell whether it was active at draw time.
+   ------------------------------------------------------------ */
+
+function createSupplementCourse(input) {
+  var s = SUPPLEMENTS[input.key];
+  if (!s) return { ok: false, errors: ['Unknown supplement: ' + input.key] };
+  if (!input.startedAt) return { ok: false, errors: ['Missing start date'] };
+
+  return {
+    ok: true,
+    course: {
+      v: 1,
+      id: input.id || ('s_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6)),
+      key: input.key,
+      dose: input.dose === undefined ? null : input.dose,
+      unit: input.unit || s.unit,
+      startedAt: input.startedAt,
+      stoppedAt: input.stoppedAt || null,
+      timeOfDay: input.timeOfDay || null,
+      note: input.note || null
+    }
+  };
+}
+
+function isActiveAt(course, iso) {
+  var t = new Date(iso).getTime();
+  if (t < new Date(course.startedAt).getTime()) return false;
+  if (course.stoppedAt && t > new Date(course.stoppedAt).getTime()) return false;
+  return true;
+}
+
+/* Could a supplement have skewed THIS result?
+   Accounts for washout: stopped long enough ago, it doesn't count. */
+function interferenceFor(observation, courses) {
+  var hits = [];
+  var drawTime = new Date(observation.collectedAt).getTime();
+
+  courses.forEach(function (c) {
+    var s = SUPPLEMENTS[c.key];
+    if (!s || !s.interferes.length) return;
+
+    var active = isActiveAt(c, observation.collectedAt);
+    var withinWashout = false;
+    if (!active && c.stoppedAt) {
+      var sinceStopH = (drawTime - new Date(c.stoppedAt).getTime()) / 3600000;
+      withinWashout = sinceStopH >= 0;
+    }
+    if (!active && !withinWashout) return;
+
+    s.interferes.forEach(function (rule) {
+      if (rule.analyte !== observation.analyte) return;
+
+      // Stopped longer ago than washout -> no effect
+      if (!active && c.stoppedAt) {
+        var h = (drawTime - new Date(c.stoppedAt).getTime()) / 3600000;
+        if (h >= (rule.washoutHours || 0)) return;
+      }
+      // Dose below threshold -> no effect
+      if (rule.threshold && c.dose !== null && c.dose < rule.threshold) return;
+
+      hits.push({
+        supplement: s.label,
+        key: c.key,
+        dose: c.dose,
+        unit: c.unit,
+        direction: rule.direction,
+        active: active,
+        why: rule.why || null,
+        washoutHours: rule.washoutHours || 0
+      });
+    });
+  });
+
+  return hits;
+}
+
+/* Out of range + a known interference in the same direction
+   = suspect the supplement first, disease second. */
+function explainOutOfRange(observation, courses, outOfRangeFn) {
+  var dir = outOfRangeFn(observation);
+  if (!dir) return null;
+  var hits = interferenceFor(observation, courses);
+  var matching = hits.filter(function (h) {
+    return (dir === 'high' && h.direction === 'up') ||
+           (dir === 'low' && h.direction === 'down');
+  });
+  if (!matching.length) return null;
+
+  return {
+    likelyArtifact: true,
+    direction: dir,
+    causes: matching,
+    message: 'Out of range, but you are taking ' +
+             matching.map(function (m) { return m.supplement; }).join(', ') +
+             ' — which shifts this parameter in the same direction. ' +
+             'Before treating this as a health problem, repeat the test after stopping ' +
+             '(at least ' + Math.max.apply(null, matching.map(function (m) { return Math.round(m.washoutHours / 24); })) +
+             ' days off).'
+  };
+}
+
+/* Test prep: what to stop and when */
+function prepAdvice(plannedAnalytes, courses, drawDateISO) {
+  var advice = [];
+  courses.forEach(function (c) {
+    var s = SUPPLEMENTS[c.key];
+    if (!s || !s.interferes.length) return;
+    if (c.stoppedAt) return;
+    s.interferes.forEach(function (rule) {
+      if (plannedAnalytes.indexOf(rule.analyte) === -1) return;
+      if (!rule.washoutHours) return;
+      if (rule.threshold && c.dose !== null && c.dose < rule.threshold) return;
+      advice.push({
+        supplement: s.label,
+        stopBeforeHours: rule.washoutHours,
+        stopByDate: new Date(new Date(drawDateISO).getTime() - rule.washoutHours * 3600000)
+                      .toISOString().slice(0, 10),
+        affects: rule.analyte,
+        why: rule.why
+      });
+    });
+  });
+  // Dedupe: longest washout wins
+  var byS = {};
+  advice.forEach(function (a) {
+    if (!byS[a.supplement] || byS[a.supplement].stopBeforeHours < a.stopBeforeHours) byS[a.supplement] = a;
+  });
+  return Object.keys(byS).map(function (k) { return byS[k]; });
+}
+
+/* ------------------------------------------------------------
+   AI CONTRACT
+
+   Rule: the model is NOT asked questions that have a hard answer.
+   Red flags bypass it entirely.
+   ------------------------------------------------------------ */
+
+var AI_SYSTEM_PROMPT = [
+  'You analyze the personal health archive of ONE person.',
+  'You receive de-identified number series: lab results, a stool diary, supplements.',
+  '',
+  'WHAT YOU DO:',
+  '- Describe trends over time and name what the numbers actually show.',
+  '- Point out when a result may be a supplement artifact rather than a health change.',
+  '- Turn findings into specific questions worth asking a doctor.',
+  '- Explain terminology in plain language.',
+  '',
+  'WHAT YOU NEVER DO:',
+  '- No diagnosis. Never name a specific disease as the explanation.',
+  '- Never rule anything out. Never write that something "looks fine", "is nothing',
+  '  to worry about", or "all normal". Normal numbers do not exclude disease, and',
+  '  false reassurance is more dangerous than a false alarm.',
+  '- No recommending or discouraging medications or supplement doses.',
+  '- Never read a single measurement as a trend.',
+  '',
+  'HOW YOU HANDLE UNCERTAINTY:',
+  '- Always state how many measurements a claim rests on.',
+  '- With n < 3, say plainly that this is too little for any conclusion.',
+  '- When a series carries a flag (lab change, range change, mixed fasting),',
+  '  state it before describing the trend.',
+  '- You cannot see symptoms, a physical exam, or anything the user did not enter.',
+  '  For any uncertainty that is the default explanation, not the last one.',
+  '',
+  'Answer in English, concisely, no emoji.'
+].join('\n');
+
+/* Questions the model is NOT asked — hard-coded logic */
+var AI_BYPASS = [
+  { when: 'redFlagPresent',
+    respond: 'A red-flag symptom was recorded. That needs a doctor, not data analysis.' },
+  { when: 'userAsksForDiagnosis',
+    respond: 'I will not diagnose. I can prepare a summary of your trends to show a doctor.' },
+  { when: 'userAsksIfSafeToSkipDoctor',
+    respond: 'I will not make that call for you, and this data does not settle it.' }
+];
+
+function shouldBypassAI(context) {
+  if (context.redFlags && context.redFlags.length) return AI_BYPASS[0];
+  return null;
+}
+
+/* Payload extended with supplements — still no identifying data.
+   Supplements as catalog keys + doses, no brand names (a brand can
+   be identifying: a specific store, a specific pharmacy). */
+function supplementsForAI(courses, referenceISO) {
+  return courses.map(function (c) {
+    var monthsOn = c.startedAt
+      ? Math.round((new Date(referenceISO) - new Date(c.startedAt)) / 2629800000 * 10) / 10
+      : null;
+    return {
+      key: c.key,
+      dose: c.dose,
+      unit: c.unit,
+      active: isActiveAt(c, referenceISO),
+      monthsOn: monthsOn
+    };
+  });
+}
+
+/* ---------------------------------------- */
+
+/* ============================================================
+   UI + STORAGE
+   ============================================================ */
+
+var DB = null, DBNAME = 'healthlog', STORES = ['obs','stools','meals','supps','metrics','settings'];
+
+function dbOpen(cb){
+  var r = indexedDB.open(DBNAME, 1);
+  r.onupgradeneeded = function(e){
+    var db = e.target.result;
+    STORES.forEach(function(s){ if(!db.objectStoreNames.contains(s)) db.createObjectStore(s,{keyPath:'id'}); });
+  };
+  r.onsuccess = function(e){ DB = e.target.result; cb(null); };
+  r.onerror = function(e){ cb(e.target.error); };
+}
+function dbPut(store, obj, cb){
+  var tx = DB.transaction(store,'readwrite');
+  tx.objectStore(store).put(obj);
+  tx.oncomplete = function(){ cb && cb(null); };
+  tx.onerror = function(e){ cb && cb(e.target.error); };
+}
+function dbAll(store, cb){
+  var tx = DB.transaction(store,'readonly'), out = [];
+  var req = tx.objectStore(store).openCursor();
+  req.onsuccess = function(e){
+    var c = e.target.result;
+    if(c){ out.push(c.value); c.continue(); } else cb(null, out);
+  };
+  req.onerror = function(e){ cb(e.target.error); };
+}
+function dbDel(store, id, cb){
+  var tx = DB.transaction(store,'readwrite');
+  tx.objectStore(store).delete(id);
+  tx.oncomplete = function(){ cb && cb(null); };
+}
+
+var STATE = { obs:[], stools:[], meals:[], supps:[], metrics:[], settings:{} };
+
+function loadAll(cb){
+  var pending = STORES.length;
+  STORES.forEach(function(s){
+    dbAll(s, function(err, rows){
+      if(s==='settings'){ (rows||[]).forEach(function(r){ STATE.settings[r.id]=r.value; }); }
+      else STATE[s] = rows||[];
+      if(--pending===0) cb();
+    });
+  });
+}
+function setSetting(k,v){ STATE.settings[k]=v; dbPut('settings',{id:k,value:v}); }
+
+function uid(p){ return (p||'x')+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7); }
+function todayISO(){ var d=new Date(); return d.toISOString().slice(0,16); }
+function fmtDate(iso){ return (iso||'').slice(0,10); }
+function el(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+/* ---------- NAVIGATION ---------- */
+var CURRENT = 'hub';
+function go(screen){
+  CURRENT = screen;
+  var all = document.querySelectorAll('.screen');
+  for(var i=0;i<all.length;i++) all[i].classList.remove('on');
+  var t = el('s-'+screen); if(t) t.classList.add('on');
+  el('backbtn').style.visibility = screen==='hub' ? 'hidden' : 'visible';
+  window.scrollTo(0,0);
+  if(screen==='trends') renderTrends();
+  if(screen==='labs') renderLabs();
+  if(screen==='supps') renderSupps();
+  if(screen==='log') renderLog();
+  if(screen==='hub') renderHub();
+}
+
+/* ---------- HUB ---------- */
+function renderHub(){
+  var last = STATE.stools.length ? STATE.stools[STATE.stools.length-1] : null;
+  var days = STATE.stools.length ? Math.round((Date.now()-new Date(STATE.stools[0].at))/86400000) : 0;
+  var n = STATE.stools.length;
+  var ready = n>=60;
+
+  el('hub-stat').innerHTML =
+    '<div class="statrow"><span class="statnum">'+n+'</span><span class="statlab">stool entries</span></div>'+
+    '<div class="statrow"><span class="statnum">'+STATE.obs.length+'</span><span class="statlab">lab results</span></div>'+
+    '<div class="statrow"><span class="statnum">'+days+'</span><span class="statlab">dni obserwacji</span></div>';
+
+  var msg;
+  if(n===0) msg = 'Start logging. Correlation analysis needs about 60 days before it means anything.';
+  else if(!ready) msg = 'Not enough data for food analysis yet. About '+Math.max(0,60-days)+' more days of logging.';
+  else msg = 'Enough data to start looking for patterns.';
+  el('hub-msg').textContent = msg;
+}
+
+/* ---------- LOG: STOOL ---------- */
+var stoolDraft = { bristol:null, urgency:null, paper:null, color:'normal', blood:false, painWakesAtNight:false, note:'' };
+
+var BRISTOL = [
+  {n:1, t:'Hard lumps', d:'separate, hard to pass'},
+  {n:2, t:'Lumpy sausage', d:'firm, bumpy surface'},
+  {n:3, t:'Cracked sausage', d:''},
+  {n:4, t:'Smooth sausage', d:'soft, narrow'},
+  {n:5, t:'Soft blobs', d:'clear edges'},
+  {n:6, t:'Mushy pieces', d:'ragged edges'},
+  {n:7, t:'Watery', d:'no solid pieces'}
+];
+
+function renderLog(){
+  var h = BRISTOL.map(function(b){
+    var cls = stoolDraft.bristol===b.n ? 'bris on' : 'bris';
+    var tone = (b.n<=2?'dry':(b.n>=6?'loose':'ok'));
+    return '<button class="'+cls+' t-'+tone+'" data-bris="'+b.n+'">'+
+      '<span class="brisn">'+b.n+'</span>'+
+      '<span class="brist">'+b.t+'</span>'+
+      (b.d?'<span class="brisd">'+b.d+'</span>':'')+'</button>';
+  }).join('');
+  el('bristol-list').innerHTML = h;
+
+  ['urgency','paper'].forEach(function(k){
+    var wrap = el('opt-'+k);
+    var opts = k==='urgency' ? ['relaxed','some','barely made it'] : ['little','normal','a lot'];
+    wrap.innerHTML = opts.map(function(o,i){
+      return '<button class="pill'+(stoolDraft[k]===i?' on':'')+'" data-opt="'+k+'" data-val="'+i+'">'+o+'</button>';
+    }).join('');
+  });
+
+  var colors = [['normal','brown'],['pale_clay','pale / clay'],['black_tarry','black tarry'],['green','green'],['yellow_greasy','yellow greasy']];
+  el('opt-color').innerHTML = colors.map(function(c){
+    return '<button class="pill'+(stoolDraft.color===c[0]?' on':'')+'" data-opt="color" data-val="'+c[0]+'">'+c[1]+'</button>';
+  }).join('');
+
+  el('chk-blood').checked = stoolDraft.blood;
+  el('chk-pain').checked = stoolDraft.painWakesAtNight;
+  checkFlags();
+  renderMealChips();
+}
+
+function checkFlags(){
+  var flags = checkRedFlags(stoolDraft);
+  var box = el('redflags');
+  if(!flags.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='block';
+  box.innerHTML = '<div class="rfhead">Objaw alarmowy</div>'+
+    flags.map(function(f){ return '<p>'+esc(f.msg)+'</p>'; }).join('');
+}
+
+function saveStool(){
+  if(stoolDraft.bristol===null){ toast('Pick a type from 1 to 7'); return; }
+  var rec = {
+    id: uid('st'), at: el('stool-time').value || todayISO(),
+    bristol: stoolDraft.bristol, urgency: stoolDraft.urgency, paper: stoolDraft.paper,
+    color: stoolDraft.color, blood: stoolDraft.blood,
+    painWakesAtNight: stoolDraft.painWakesAtNight, note: el('stool-note').value||''
+  };
+  dbPut('stools', rec, function(){
+    STATE.stools.push(rec);
+    STATE.stools.sort(function(a,b){ return new Date(a.at)-new Date(b.at); });
+    stoolDraft = { bristol:null, urgency:null, paper:null, color:'normal', blood:false, painWakesAtNight:false, note:'' };
+    el('stool-note').value='';
+    renderLog(); toast('Saved');
+  });
+}
+
+/* ---------- LOG: MEAL ---------- */
+var mealDraft = [];
+function renderMealChips(){
+  el('meal-chips').innerHTML = mealDraft.map(function(m,i){
+    return '<span class="chip">'+esc(m)+'<button data-rmchip="'+i+'">×</button></span>';
+  }).join('') || '<span class="muted">No items yet</span>';
+
+  var seen = {}, freq = {};
+  STATE.meals.forEach(function(m){ (m.items||[]).forEach(function(it){ freq[it]=(freq[it]||0)+1; }); });
+  var top = Object.keys(freq).sort(function(a,b){return freq[b]-freq[a];}).slice(0,12);
+  el('meal-recent').innerHTML = top.map(function(t){
+    return '<button class="pill sm" data-addchip="'+esc(t)+'">'+esc(t)+'</button>';
+  }).join('');
+}
+function addChip(v){
+  v = (v||'').trim().toLowerCase();
+  if(!v) return;
+  if(mealDraft.indexOf(v)===-1) mealDraft.push(v);
+  el('meal-input').value='';
+  renderMealChips();
+}
+function saveMeal(){
+  if(!mealDraft.length){ toast('Add at least one item'); return; }
+  var rec = { id: uid('ml'), at: el('meal-time').value || todayISO(), items: mealDraft.slice() };
+  dbPut('meals', rec, function(){
+    STATE.meals.push(rec);
+    STATE.meals.sort(function(a,b){ return new Date(a.at)-new Date(b.at); });
+    mealDraft = []; renderMealChips(); toast('Saved');
+  });
+}
+
+/* ---------- METRICS (weight + custom) ---------- */
+var DEFAULT_METRICS = [
+  { key:'weight', label:'Weight', unit:'kg', builtin:true },
+  { key:'height', label:'Height', unit:'cm', builtin:true }
+];
+function allMetricDefs(){
+  var custom = STATE.settings.customMetrics || [];
+  return DEFAULT_METRICS.concat(custom);
+}
+function renderMetrics(){
+  var defs = allMetricDefs();
+  el('metric-select').innerHTML = defs.map(function(d){
+    return '<option value="'+d.key+'">'+esc(d.label)+' ('+esc(d.unit)+')</option>';
+  }).join('');
+
+  var byKey = {};
+  STATE.metrics.forEach(function(m){ (byKey[m.key]=byKey[m.key]||[]).push(m); });
+
+  var html = defs.map(function(d){
+    var rows = (byKey[d.key]||[]).sort(function(a,b){ return new Date(b.at)-new Date(a.at); });
+    if(!rows.length) return '';
+    var latest = rows[0];
+    var prev = rows[1];
+    var delta = prev ? (latest.value-prev.value) : null;
+    return '<div class="mrow"><div><div class="mlab">'+esc(d.label)+'</div>'+
+      '<div class="msub">'+fmtDate(latest.at)+' · '+rows.length+' readings</div></div>'+
+      '<div class="mval">'+latest.value+'<span class="munit">'+esc(d.unit)+'</span>'+
+      (delta!==null?'<div class="mdelta '+(delta>0?'up':'down')+'">'+(delta>0?'+':'')+Math.round(delta*10)/10+'</div>':'')+
+      '</div></div>';
+  }).join('');
+
+  var bmi = calcBMI();
+  el('metric-list').innerHTML = (bmi ? '<div class="bmibox"><div class="mlab">BMI</div><div class="bmival">'+bmi.value+'</div><div class="msub">'+bmi.band+'</div></div>' : '') + (html || '<p class="muted">No readings yet.</p>');
+}
+function calcBMI(){
+  var w = latestMetric('weight'), h = latestMetric('height');
+  if(!w||!h||!h.value) return null;
+  var m = h.value/100;
+  var v = Math.round((w.value/(m*m))*10)/10;
+  var band = v<18.5?'underweight':(v<25?'healthy range':(v<30?'overweight':'obese'));
+  return { value:v, band:band };
+}
+function latestMetric(key){
+  var rows = STATE.metrics.filter(function(m){ return m.key===key; })
+    .sort(function(a,b){ return new Date(b.at)-new Date(a.at); });
+  return rows[0]||null;
+}
+function saveMetric(){
+  var key = el('metric-select').value;
+  var v = parseFloat(el('metric-value').value);
+  if(isNaN(v)){ toast('Enter a number'); return; }
+  var rec = { id: uid('mt'), key:key, value:v, at: el('metric-time').value || todayISO() };
+  dbPut('metrics', rec, function(){
+    STATE.metrics.push(rec); el('metric-value').value='';
+    renderMetrics(); toast('Saved');
+  });
+}
+function addCustomMetric(){
+  var label = prompt('Measurement name (e.g. Systolic BP):');
+  if(!label) return;
+  var unit = prompt('Unit (e.g. mmHg):') || '';
+  var list = (STATE.settings.customMetrics||[]).slice();
+  list.push({ key:'c_'+list.length+'_'+Date.now().toString(36), label:label, unit:unit });
+  setSetting('customMetrics', list);
+  renderMetrics(); toast('Measurement added');
+}
+
+/* ---------- LABS ---------- */
+function renderLabs(){
+  var byA = {};
+  STATE.obs.forEach(function(o){ (byA[o.analyte]=byA[o.analyte]||[]).push(o); });
+  var keys = Object.keys(byA);
+  if(!keys.length){ el('lab-list').innerHTML = '<p class="muted">No results yet. Add a photo of a lab report or enter values manually.</p>'; return; }
+
+  el('lab-list').innerHTML = keys.map(function(k){
+    var s = buildSeries(STATE.obs, k);
+    var last = s.points[s.points.length-1];
+    var art = explainOutOfRange(byA[k][byA[k].length-1], STATE.supps, function(o){
+      if(o.refLow!==null && o.value<o.refLow) return 'low';
+      if(o.refHigh!==null && o.value>o.refHigh) return 'high';
+      return null;
+    });
+    var drift = driftWithinRange(s);
+    return '<div class="labcard" data-analyte="'+k+'">'+
+      '<div class="labhead"><span class="lname">'+esc(s.label)+'</span>'+
+      '<span class="lval '+(last.out||'')+'">'+last.v+' <em>'+esc(s.unit)+'</em></span></div>'+
+      sparkline(s)+
+      (s.flags.length?'<div class="lflag">'+s.flags.map(esc).join('<br>')+'</div>':'')+
+      (drift?'<div class="ldrift">'+esc(drift.message)+'</div>':'')+
+      (art?'<div class="lart">'+esc(art.message)+'</div>':'')+
+      '</div>';
+  }).join('');
+}
+
+function sparkline(s){
+  var w=280,h=54,pad=4;
+  var vals = s.points.map(function(p){return p.v;});
+  var lows = s.points.map(function(p){return p.refLow;}).filter(function(x){return x!==null;});
+  var highs = s.points.map(function(p){return p.refHigh;}).filter(function(x){return x!==null;});
+  var min = Math.min.apply(null, vals.concat(lows));
+  var max = Math.max.apply(null, vals.concat(highs));
+  if(min===max){ min-=1; max+=1; }
+  var range = max-min;
+  function y(v){ return pad + (h-2*pad) * (1-(v-min)/range); }
+  function x(i){ return s.points.length===1 ? w/2 : pad + (w-2*pad)*i/(s.points.length-1); }
+
+  var bands = '';
+  s.points.forEach(function(p,i){
+    if(p.refLow===null||p.refHigh===null) return;
+    var x0 = i===0?0:(x(i)+x(i-1))/2;
+    var x1 = i===s.points.length-1?w:(x(i)+x(i+1))/2;
+    bands += '<rect x="'+x0+'" y="'+y(p.refHigh)+'" width="'+(x1-x0)+'" height="'+(y(p.refLow)-y(p.refHigh))+'" class="band"/>';
+  });
+  var path = s.points.map(function(p,i){ return (i?'L':'M')+x(i)+' '+y(p.v); }).join(' ');
+  var dots = s.points.map(function(p,i){
+    return '<circle cx="'+x(i)+'" cy="'+y(p.v)+'" r="3.5" class="dot '+(p.out||'in')+'"/>';
+  }).join('');
+  return '<svg class="spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+bands+
+    '<path d="'+path+'" class="line"/>'+dots+'</svg>';
+}
+
+/* --- manual entry --- */
+function renderAnalyteSelect(){
+  var groups = {};
+  Object.keys(ANALYTES).forEach(function(k){
+    var g = ANALYTES[k].group;
+    (groups[g]=groups[g]||[]).push(k);
+  });
+  el('lab-analyte').innerHTML = Object.keys(groups).map(function(g){
+    return '<optgroup label="'+esc(g)+'">'+groups[g].map(function(k){
+      return '<option value="'+k+'">'+esc(ANALYTES[k].label)+'</option>';
+    }).join('')+'</optgroup>';
+  }).join('');
+  syncUnits();
+}
+function syncUnits(){
+  var k = el('lab-analyte').value;
+  var a = ANALYTES[k];
+  el('lab-unit').innerHTML = Object.keys(a.units).map(function(u){
+    return '<option value="'+esc(u)+'">'+esc(u)+'</option>';
+  }).join('');
+  el('lab-note').textContent = a.note || '';
+}
+function saveLab(){
+  var input = {
+    analyte: el('lab-analyte').value,
+    value: parseFloat(el('lab-value').value),
+    unit: el('lab-unit').value,
+    refLow: el('lab-reflow').value===''?null:parseFloat(el('lab-reflow').value),
+    refHigh: el('lab-refhigh').value===''?null:parseFloat(el('lab-refhigh').value),
+    collectedAt: el('lab-date').value || new Date().toISOString().slice(0,10),
+    labId: el('lab-lab').value||null,
+    fasting: el('lab-fasting').value==='' ? undefined : el('lab-fasting').value==='1',
+    sex: STATE.settings.sex||'M'
+  };
+  var r = createObservation(input);
+  if(!r.ok){ toast(r.errors[0]); return; }
+  dbPut('obs', r.obs, function(){
+    STATE.obs.push(r.obs);
+    el('lab-value').value=''; el('lab-reflow').value=''; el('lab-refhigh').value='';
+    if(r.obs.warnings.length) el('lab-warn').innerHTML = r.obs.warnings.map(esc).join('<br>');
+    renderLabs(); toast('Saved');
+  });
+}
+
+/* --- lab photo: masking + extraction --- */
+var maskCanvas=null, maskCtx=null, maskImg=null, masking=false;
+function loadLabPhoto(file){
+  var fr = new FileReader();
+  fr.onload = function(){
+    maskImg = new Image();
+    maskImg.onload = function(){
+      var c = el('mask-canvas');
+      var scale = Math.min(1, 900/maskImg.width);
+      c.width = maskImg.width*scale; c.height = maskImg.height*scale;
+      maskCtx = c.getContext('2d');
+      maskCtx.drawImage(maskImg,0,0,c.width,c.height);
+      // Header auto-masked — patient details live there in nearly every format.
+      // The user can undo this if it covered something needed.
+      maskCtx.fillStyle='#0F1826';
+      maskCtx.fillRect(0,0,c.width,Math.round(c.height*0.13));
+      el('mask-wrap').style.display='block';
+      el('mask-checklist').style.display='block';
+      el('photo-step').textContent='Header blacked out automatically. Check the list below and paint over anything left.';
+    };
+    maskImg.src = fr.result;
+  };
+  fr.readAsDataURL(file);
+}
+
+function resetMask(){
+  if(!maskImg||!maskCtx) return;
+  var c = el('mask-canvas');
+  maskCtx.drawImage(maskImg,0,0,c.width,c.height);
+  el('photo-step').textContent='Mask cleared. Black out personal details before sending.';
+}
+function setupMask(){
+  var c = el('mask-canvas');
+  function pos(e){
+    var r = c.getBoundingClientRect();
+    var t = e.touches ? e.touches[0] : e;
+    return { x:(t.clientX-r.left)*(c.width/r.width), y:(t.clientY-r.top)*(c.height/r.height) };
+  }
+  function down(e){ masking=true; e.preventDefault(); draw(e); }
+  function up(){ masking=false; maskCtx && maskCtx.beginPath(); }
+  function draw(e){
+    if(!masking||!maskCtx) return;
+    e.preventDefault();
+    var p = pos(e);
+    maskCtx.fillStyle='#0F1826';
+    maskCtx.fillRect(p.x-22,p.y-14,44,28);
+  }
+  ['mousedown','touchstart'].forEach(function(ev){ c.addEventListener(ev,down,{passive:false}); });
+  ['mousemove','touchmove'].forEach(function(ev){ c.addEventListener(ev,draw,{passive:false}); });
+  ['mouseup','touchend','mouseleave'].forEach(function(ev){ c.addEventListener(ev,up); });
+}
+
+function extractFromPhoto(){
+  var ep = STATE.settings.endpoint;
+  if(!ep){ toast('Set your Worker URL in Settings first'); go('settings'); return; }
+  var c = el('mask-canvas');
+  var b64 = c.toDataURL('image/jpeg',0.8).split(',')[1];
+  el('photo-step').textContent='Reading...';
+
+  var prompt = 'Read the lab results from this image. Return ONLY a JSON array, '+
+    'no commentary and no markdown fences. '+
+    'Format: [{"name":"name as printed","value":number,"unit":"unit","refLow":number|null,"refHigh":number|null}]. '+
+    'Skip any personal data. If the image is unreadable, return [].';
+
+  fetch(ep, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      model:'claude-sonnet-4-6', max_tokens:1500,
+      messages:[{ role:'user', content:[
+        { type:'image', source:{ type:'base64', media_type:'image/jpeg', data:b64 } },
+        { type:'text', text: prompt }
+      ]}]
+    })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    var txt = (d.content||[]).filter(function(i){return i.type==='text';}).map(function(i){return i.text;}).join('');
+    txt = txt.replace(/```json|```/g,'').trim();
+    var rows = JSON.parse(txt);
+    showExtracted(rows);
+  }).catch(function(e){
+    el('photo-step').textContent='Could not read it. Enter manually.';
+    console.error(e);
+  });
+}
+
+function showExtracted(rows){
+  if(!rows.length){ el('photo-step').textContent='Nothing was read. Enter manually.'; return; }
+  el('photo-step').textContent='Check and map each result. Nothing is saved automatically.';
+  var opts = Object.keys(ANALYTES).map(function(k){
+    return '<option value="'+k+'">'+esc(ANALYTES[k].label)+'</option>';
+  }).join('');
+  el('extracted').innerHTML = rows.map(function(r,i){
+    var guess = guessAnalyte(r.name);
+    return '<div class="exrow" data-ex="'+i+'">'+
+      '<div class="exname">'+esc(r.name)+'</div>'+
+      '<select class="exsel">'+'<option value="">— skip —</option>'+opts+'</select>'+
+      '<div class="exline"><input class="exval" value="'+esc(r.value)+'"><input class="exunit" value="'+esc(r.unit||'')+'" placeholder="jedn.">'+
+      '<input class="exlo" value="'+(r.refLow==null?'':r.refLow)+'" placeholder="od"><input class="exhi" value="'+(r.refHigh==null?'':r.refHigh)+'" placeholder="do"></div>'+
+      '</div>';
+  }).join('');
+  var rowsEl = document.querySelectorAll('.exrow');
+  for(var i=0;i<rowsEl.length;i++){
+    var g = guessAnalyte(rows[i].name);
+    if(g) rowsEl[i].querySelector('.exsel').value = g;
+  }
+  el('ex-actions').style.display='block';
+}
+function guessAnalyte(name){
+  if(!name) return '';
+  var n = name.toLowerCase();
+  var best='';
+  Object.keys(ANALYTES).forEach(function(k){
+    var a = ANALYTES[k];
+    var cands = [a.label.toLowerCase(), (a.labelPl||'').toLowerCase(), k];
+    cands.forEach(function(c){
+      if(c && (n.indexOf(c)!==-1 || c.indexOf(n)!==-1) && !best) best=k;
+    });
+  });
+  return best;
+}
+function saveExtracted(){
+  var rows = document.querySelectorAll('.exrow');
+  var date = el('ex-date').value || new Date().toISOString().slice(0,10);
+  var lab = el('ex-lab').value||null;
+  var saved=0, errs=[];
+  for(var i=0;i<rows.length;i++){
+    var r = rows[i];
+    var key = r.querySelector('.exsel').value;
+    if(!key) continue;
+    var res = createObservation({
+      analyte:key, value:parseFloat(r.querySelector('.exval').value),
+      unit:r.querySelector('.exunit').value,
+      refLow: r.querySelector('.exlo').value===''?null:parseFloat(r.querySelector('.exlo').value),
+      refHigh: r.querySelector('.exhi').value===''?null:parseFloat(r.querySelector('.exhi').value),
+      collectedAt:date, labId:lab, sex:STATE.settings.sex||'M'
+    });
+    if(res.ok){ dbPut('obs',res.obs); STATE.obs.push(res.obs); saved++; }
+    else errs.push(res.errors[0]);
+  }
+  toast(saved+' saved'+(errs.length?', '+errs.length+' failed':''));
+  el('extracted').innerHTML=''; el('ex-actions').style.display='none';
+  el('mask-wrap').style.display='none'; el('mask-checklist').style.display='none';
+  el('photo-step').textContent='';
+  renderLabs();
+}
+
+/* ---------- SUPPLEMENTS ---------- */
+function renderSupps(){
+  el('supp-select').innerHTML = Object.keys(SUPPLEMENTS).map(function(k){
+    return '<option value="'+k+'">'+esc(SUPPLEMENTS[k].label)+'</option>';
+  }).join('');
+
+  var active = STATE.supps.filter(function(s){ return !s.stoppedAt; });
+  var past = STATE.supps.filter(function(s){ return s.stoppedAt; });
+
+  function card(c){
+    var s = SUPPLEMENTS[c.key];
+    var warn = s.interferes.length ? s.interferes.map(function(r){
+      return ANALYTES[r.analyte] ? ANALYTES[r.analyte].label+' '+(r.direction==='up'?'↑':'↓') : '';
+    }).filter(Boolean).join(', ') : '';
+    return '<div class="suppcard'+(c.stoppedAt?' off':'')+'">'+
+      '<div class="srow"><span class="sname">'+esc(s.label)+'</span>'+
+      '<span class="sdose">'+(c.dose!=null?c.dose+' '+esc(c.unit):'')+'</span></div>'+
+      '<div class="msub">od '+fmtDate(c.startedAt)+(c.stoppedAt?' do '+fmtDate(c.stoppedAt):'')+'</div>'+
+      (warn?'<div class="sint">skews results: '+esc(warn)+'</div>':'')+
+      (s.note?'<div class="snote">'+esc(s.note)+'</div>':'')+
+      '<div class="sacts">'+(c.stoppedAt?'':'<button class="mini" data-stop="'+c.id+'">Odstaw</button>')+
+      '<button class="mini danger" data-delsupp="'+c.id+'">Delete</button></div></div>';
+  }
+  el('supp-active').innerHTML = active.length?active.map(card).join(''):'<p class="muted">Brak aktywnych.</p>';
+  el('supp-past').innerHTML = past.map(card).join('');
+}
+function addSupp(){
+  var r = createSupplementCourse({
+    key: el('supp-select').value,
+    dose: el('supp-dose').value===''?null:parseFloat(el('supp-dose').value),
+    startedAt: el('supp-start').value || new Date().toISOString().slice(0,10)
+  });
+  if(!r.ok){ toast(r.errors[0]); return; }
+  dbPut('supps', r.course, function(){
+    STATE.supps.push(r.course); el('supp-dose').value=''; renderSupps(); toast('Added');
+  });
+}
+function stopSupp(id){
+  var c = STATE.supps.filter(function(s){return s.id===id;})[0];
+  if(!c) return;
+  c.stoppedAt = new Date().toISOString().slice(0,10);
+  dbPut('supps', c, function(){ renderSupps(); toast('Stopped'); });
+}
+
+/* ---------- TRENDS / ANALYSIS ---------- */
+function renderTrends(){
+  var n = STATE.stools.length;
+  var out = '';
+
+  if(n<10){
+    out += '<div class="notice">You have '+n+' entries. Correlation analysis needs about 60 days of '+
+           'logging to tell a real pattern from chance.</div>';
+  } else {
+    var t = permutationTest(STATE.meals, STATE.stools, { permutations:300 });
+    if(t.note){ out += '<div class="notice">'+esc(t.note)+'</div>'; }
+    else if(!t.significant.length){
+      out += '<div class="notice">Tested '+t.tested+' items. '+
+             'None stands out from chance. That does not mean nothing affects you — '+
+             'it means the data does not show it yet.</div>';
+    } else {
+      out += '<div class="notice good">Candidates worth testing by elimination:</div>';
+      out += t.significant.map(function(c){
+        return '<div class="cand"><div class="crow"><span class="cname">'+esc(c.item)+'</span>'+
+          '<span class="clift">×'+c.peakLift+'</span></div>'+
+          '<div class="msub">p = '+c.p+' · '+c.peakExposures+' exposures · confidence: '+c.confidence+'</div></div>';
+      }).join('');
+      out += '<div class="notice">These are candidates, not causes. Confirm with 2 weeks off, then reintroduce.</div>';
+    }
+
+    var dist = {}; for(var i=1;i<=7;i++) dist[i]=0;
+    STATE.stools.forEach(function(s){ dist[s.bristol]++; });
+    out += '<h3>Type distribution</h3><div class="distbar">';
+    for(var b=1;b<=7;b++){
+      var pct = Math.round(100*dist[b]/n);
+      out += '<div class="distrow"><span class="dn">'+b+'</span>'+
+        '<div class="dbar"><div class="dfill t-'+(b<=2?'dry':(b>=6?'loose':'ok'))+'" style="width:'+pct+'%"></div></div>'+
+        '<span class="dp">'+pct+'%</span></div>';
+    }
+    out += '</div>';
+  }
+  el('trend-body').innerHTML = out;
+}
+
+/* ---------- CHAT ---------- */
+var chatLog = [];
+function sendChat(){
+  var q = el('chat-input').value.trim();
+  if(!q) return;
+  var ep = STATE.settings.endpoint;
+  if(!ep){ toast('Set your Worker URL in Settings'); go('settings'); return; }
+
+  var recentFlags = [];
+  STATE.stools.slice(-5).forEach(function(s){ recentFlags = recentFlags.concat(checkRedFlags(s)); });
+  var bypass = shouldBypassAI({ redFlags: recentFlags });
+
+  chatLog.push({ role:'user', content:q });
+  el('chat-input').value='';
+  renderChat();
+
+  if(bypass){
+    chatLog.push({ role:'assistant', content: bypass.respond + '\n\n' +
+      recentFlags.map(function(f){return '• '+f.msg;}).join('\n') });
+    renderChat(); return;
+  }
+
+  var payload;
+  try {
+    payload = buildAIPayload({ age: STATE.settings.age, sex: STATE.settings.sex },
+      STATE.obs, STATE.stools, STATE.meals);
+    payload.supplements = supplementsForAI(STATE.supps, new Date().toISOString());
+    var bmi = calcBMI();
+    if(bmi) payload.bmi = bmi.value;
+  } catch(e){
+    chatLog.push({ role:'assistant', content:'Send blocked: '+e.message });
+    renderChat(); return;
+  }
+
+  chatLog.push({ role:'assistant', content:'…' });
+  renderChat();
+
+  fetch(ep, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      model:'claude-sonnet-4-6', max_tokens:1200,
+      system: AI_SYSTEM_PROMPT + '\n\nDANE:\n' + JSON.stringify(payload),
+      messages: chatLog.filter(function(m){return m.content!=='…';}).map(function(m){
+        return { role:m.role, content:m.content };
+      })
+    })
+  }).then(function(r){return r.json();}).then(function(d){
+    var txt = (d.content||[]).filter(function(i){return i.type==='text';}).map(function(i){return i.text;}).join('');
+    chatLog[chatLog.length-1] = { role:'assistant', content: txt || 'No response.' };
+    renderChat();
+  }).catch(function(e){
+    chatLog[chatLog.length-1] = { role:'assistant', content:'Connection failed. Check your Worker URL.' };
+    renderChat();
+  });
+}
+function renderChat(){
+  el('chat-log').innerHTML = chatLog.map(function(m){
+    return '<div class="msg '+m.role+'">'+esc(m.content).replace(/\n/g,'<br>')+'</div>';
+  }).join('');
+  var c = el('chat-log'); c.scrollTop = c.scrollHeight;
+}
+
+/* ---------- SETTINGS / EXPORT ---------- */
+function renderSettings(){
+  el('set-endpoint').value = STATE.settings.endpoint||'';
+  el('set-age').value = STATE.settings.age||'';
+  el('set-sex').value = STATE.settings.sex||'M';
+}
+function saveSettings(){
+  setSetting('endpoint', el('set-endpoint').value.trim());
+  setSetting('age', parseInt(el('set-age').value,10)||null);
+  setSetting('sex', el('set-sex').value);
+  toast('Saved');
+}
+function doExport(){
+  var json = exportAll({ obs:STATE.obs, stools:STATE.stools, meals:STATE.meals,
+    supps:STATE.supps, metrics:STATE.metrics, settings:STATE.settings });
+  var blob = new Blob([json], {type:'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'health-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+}
+function doImport(file){
+  var fr = new FileReader();
+  fr.onload = function(){
+    try {
+      var data = importAll(fr.result);
+      ['obs','stools','meals','supps','metrics'].forEach(function(k){
+        (data[k]||[]).forEach(function(r){ dbPut(k==='obs'?'obs':k, r); });
+      });
+      toast('Imported. Refresh the page.');
+    } catch(e){ toast(e.message); }
+  };
+  fr.readAsText(file);
+}
+
+/* ---------- TOAST ---------- */
+var toastT;
+function toast(msg){
+  var t = el('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(function(){ t.classList.remove('on'); }, 2200);
+}
+
+/* ---------- EVENT DELEGATION (no inline onclick — Safari) ---------- */
+document.addEventListener('click', function(e){
+  var t = e.target.closest ? e.target.closest('[data-go],[data-bris],[data-opt],[data-addchip],[data-rmchip],[data-stop],[data-delsupp],[data-act]') : null;
+  if(!t) return;
+  var d = t.dataset;
+  if(d.go) go(d.go);
+  else if(d.bris){ stoolDraft.bristol = parseInt(d.bris,10); renderLog(); }
+  else if(d.opt){ stoolDraft[d.opt] = d.opt==='color' ? d.val : parseInt(d.val,10); renderLog(); }
+  else if(d.addchip) addChip(d.addchip);
+  else if(d.rmchip){ mealDraft.splice(parseInt(d.rmchip,10),1); renderMealChips(); }
+  else if(d.stop) stopSupp(d.stop);
+  else if(d.delsupp){ dbDel('supps',d.delsupp,function(){ STATE.supps = STATE.supps.filter(function(s){return s.id!==d.delsupp;}); renderSupps(); }); }
+  else if(d.act){
+    var m = { saveStool:saveStool, saveMeal:saveMeal, saveMetric:saveMetric, addCustom:addCustomMetric,
+      saveLab:saveLab, addSupp:addSupp, saveSettings:saveSettings, export:doExport,
+      extract:extractFromPhoto, saveEx:saveExtracted, send:sendChat, resetMask:resetMask, back:function(){ go('hub'); } };
+    m[d.act] && m[d.act]();
+  }
+});
+
+/* ---------- BOOT ---------- */
+function boot(){
+  dbOpen(function(err){
+    if(err){ document.body.innerHTML='<p style="padding:20px">No database access. Enable IndexedDB.</p>'; return; }
+    loadAll(function(){
+      STATE.stools.sort(function(a,b){return new Date(a.at)-new Date(b.at);});
+      STATE.meals.sort(function(a,b){return new Date(a.at)-new Date(b.at);});
+      renderAnalyteSelect(); renderMetrics(); renderSettings(); setupMask(); renderSupps();
+      el('stool-time').value = todayISO();
+      el('meal-time').value = todayISO();
+      el('metric-time').value = todayISO();
+      el('supp-start').value = new Date().toISOString().slice(0,10);
+      go('hub');
+    });
+  });
+
+  el('lab-analyte').addEventListener('change', syncUnits);
+  el('meal-input').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); addChip(this.value); } });
+  el('chk-blood').addEventListener('change', function(){ stoolDraft.blood=this.checked; checkFlags(); });
+  el('chk-pain').addEventListener('change', function(){ stoolDraft.painWakesAtNight=this.checked; checkFlags(); });
+  el('photo-input').addEventListener('change', function(){ if(this.files[0]) loadLabPhoto(this.files[0]); });
+  el('import-input').addEventListener('change', function(){ if(this.files[0]) doImport(this.files[0]); });
+  el('backbtn').addEventListener('click', function(){ go('hub'); });
+}
+
+boot();
+</script>
+</body>
+</html>
