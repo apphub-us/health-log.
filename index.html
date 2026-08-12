@@ -300,6 +300,11 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
   padding-top:8px;border-top:1px solid var(--line)}
 .fwarn{font-size:12px;color:var(--ink2);margin-top:9px;padding-top:8px;
   border-top:1px solid var(--line)}
+
+.dayhead{display:flex;justify-content:space-between;align-items:center}
+#goal-editor{background:var(--card);border:1px solid var(--line);
+  border-top:none;border-radius:0 0 var(--r) var(--r);padding:14px;margin-top:-7px}
+#goal-editor .btn{margin-top:12px}
 </style>
 </head>
 <body>
@@ -371,8 +376,14 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 <section id="s-food" class="screen">
   <h2>Food</h2>
   <div id="daily-totals"></div>
+  <div id="goal-editor" style="display:none">
+    <p class="muted">Leave a field blank to track the total without a target.</p>
+    <div id="goal-fields" class="two"></div>
+    <button class="btn ghost" data-act="saveGoals">Save goals</button>
+  </div>
 
-  <h3>Log a meal</h3>
+  <h3>What did you eat?</h3>
+  <p class="sub">Type a name. Foods you have set up will suggest themselves.</p>
   <input type="text" id="meal-input" placeholder="Search your foods, or type anything" autocomplete="off">
   <div id="meal-suggest"></div>
   <div class="pills" id="meal-recent"></div>
@@ -381,7 +392,9 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
   <input type="datetime-local" id="meal-time">
   <button class="btn" data-act="saveMeal">Save meal</button>
 
-  <h3>Add a new food</h3>
+  <h3>Set up a new food</h3>
+  <p class="sub">One-time setup so the app knows its calories and ingredients.
+  After saving, it drops straight into the meal above and you pick a portion.</p>
   <div class="methodtabs" id="method-tabs">
     <button class="mtab on" data-fmethod="barcode">Barcode</button>
     <button class="mtab" data-fmethod="photo">Label photo</button>
@@ -567,11 +580,6 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
     <div><label for="set-sex">Sex</label><select id="set-sex"><option value="M">Male</option><option value="F">Female</option></select></div>
   </div>
   <button class="btn" data-act="saveSettings">Save</button>
-
-  <h3>Daily goals</h3>
-  <p class="muted">Leave a field blank to track the total without a target.</p>
-  <div id="goal-fields" class="two"></div>
-  <button class="btn ghost" data-act="saveGoals">Save goals</button>
 
   <h3>Backup</h3>
   <p class="muted">Your data lives only in this browser. Clearing site data deletes it.
@@ -2397,6 +2405,14 @@ function saveMeal(){
 /* ---------- DAILY MACROS ---------- */
 function goals(){ return STATE.settings.goals || {}; }
 
+function toggleGoals(){
+  var box = el('goal-editor');
+  var open = box.style.display==='block';
+  box.style.display = open ? 'none' : 'block';
+  el('goal-toggle').textContent = open ? 'Edit goals' : 'Close';
+  if(!open) renderGoalInputs();
+}
+
 function renderDaily(){
   var day = (el('meal-time').value || todayISO()).slice(0,10);
   var t = dailyTotals(STATE.meals, productMap(), day);
@@ -2423,7 +2439,13 @@ function renderDaily(){
     note = '<div class="nmiss">Nothing counted yet today. Add a portion to a saved product to see totals.</div>';
   }
 
-  el('daily-totals').innerHTML = '<div class="dayhead">'+day+'</div>'+rows+note;
+  var anyGoal = Object.keys(g).length>0;
+  var head = '<div class="dayhead"><span>'+day+'</span>'+
+    '<button class="mini" id="goal-toggle" data-act="toggleGoals">Edit goals</button></div>';
+  if(!anyGoal){
+    note += '<div class="nmiss">No daily targets set yet. Add them to see progress bars.</div>';
+  }
+  el('daily-totals').innerHTML = head+rows+note;
 }
 
 function saveGoals(){
@@ -2433,6 +2455,7 @@ function saveGoals(){
     if(!isNaN(v) && v>0) g[n.key]=v;
   });
   setSetting('goals', g);
+  el('goal-editor').style.display='none';
   renderDaily(); toast('Goals saved');
 }
 function renderGoalInputs(){
@@ -2875,7 +2898,14 @@ function saveProduct(){
     el('prod-serving').value=''; el('prod-barcode').value='';
     NUTRIENTS.forEach(function(n){ el('nut-'+n.key).value=''; });
     el('prod-preview').innerHTML=''; el('prod-save').style.display='none';
-    renderProducts(); toast('Saved. It will show up in meal suggestions.');
+    // Zapisanie produktu to konfiguracja, nie zjedzenie go.
+    // Wrzucamy go od razu do biezacego posilku, zeby drugi krok
+    // nie byl niewidoczny.
+    if(mealDraft.indexOf(name)===-1) mealDraft.push(name);
+    renderFood();
+    var anchor = el('meal-chips');
+    if(anchor && anchor.scrollIntoView) anchor.scrollIntoView({block:'center'});
+    toast(rec.nutrition ? 'Saved. Now pick how much you ate.' : 'Saved to your foods.');
   });
 }
 
@@ -3221,7 +3251,7 @@ document.addEventListener('click', function(e){
   else if(d.delsupp){ dbDel('supps',d.delsupp,function(){ STATE.supps = STATE.supps.filter(function(s){return s.id!==d.delsupp;}); renderSupps(); }); }
   else if(d.act){
     var m = { saveStool:saveStool, saveMeal:saveMeal, saveMetric:saveMetric, addCustom:addCustomMetric,
-      saveLab:saveLab, addSupp:addSupp, addCustomSupp:addCustomSupp, parseProd:parseProductText, saveProd:saveProduct, lookup:function(){ lookupBarcode(el('prod-barcode').value); }, saveGoals:saveGoals, saveSettings:saveSettings, export:doExport,
+      saveLab:saveLab, addSupp:addSupp, addCustomSupp:addCustomSupp, parseProd:parseProductText, saveProd:saveProduct, lookup:function(){ lookupBarcode(el('prod-barcode').value); }, saveGoals:saveGoals, toggleGoals:toggleGoals, saveSettings:saveSettings, export:doExport,
       extract:extractFromPhoto, saveEx:saveExtracted, send:sendChat, resetMask:resetMask, back:function(){ go('hub'); } };
     m[d.act] && m[d.act]();
   }
