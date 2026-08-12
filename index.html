@@ -265,13 +265,41 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 .nmiss{font-size:12px;line-height:1.5;color:var(--ink2);margin-top:12px;
   padding-left:9px;border-left:2px solid var(--line)}
 /* --- portions --- */
-.chiprow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;width:100%}
-.portwrap{display:flex;align-items:center;gap:6px}
-.portin{width:64px;height:32px;font-size:13.5px;padding:4px 7px;text-align:center}
-.portlbl{font-size:12px;color:var(--ink2)}
-.portkcal{font:600 12px var(--mono);color:var(--deep)}
 .pnut{font:500 13px var(--mono);color:var(--deep);margin-top:6px}
 #meal-chips{display:block}
+
+/* --- method tabs --- */
+.methodtabs{display:flex;gap:0;border:1px solid var(--line);border-radius:var(--r);
+  overflow:hidden;margin-bottom:14px}
+.mtab{flex:1;background:var(--card);border:none;border-right:1px solid var(--line);
+  padding:11px 6px;font-size:13.5px;cursor:pointer;color:var(--ink2)}
+.mtab:last-child{border-right:none}
+.mtab.on{background:var(--deep);color:#fff;font-weight:600}
+.fmethod{display:none}
+.fmethod.on{display:block}
+#prod-common{border-top:1px solid var(--line);margin-top:18px;padding-top:4px}
+
+/* --- meal items with portion picker --- */
+#meal-chips{display:grid;gap:8px;margin:10px 0}
+.fitem{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px 13px}
+.fhead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.fname{font-weight:600;font-size:15.5px;text-transform:capitalize}
+.frm{background:none;border:none;color:var(--ink2);font-size:21px;line-height:1;
+  cursor:pointer;padding:0 2px;flex:none}
+.frm:hover{color:var(--signal)}
+.fserv{font-size:12px;color:var(--ink2);margin-top:3px}
+.fnone{font-size:12px;color:var(--ink2);margin-top:5px;font-style:italic}
+.fportion{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:10px}
+.fq{font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink2);margin-right:3px}
+.qp{min-width:42px;height:36px;background:var(--paper);border:1px solid var(--line);
+  border-radius:var(--r);font:600 14px var(--mono);cursor:pointer}
+.qp.on{background:var(--deep);color:#fff;border-color:var(--deep)}
+.portin{width:72px;height:36px;font-size:13.5px;padding:4px 7px;text-align:center}
+.ftot{font:600 13px var(--mono);color:var(--deep);margin-top:9px;
+  padding-top:8px;border-top:1px solid var(--line)}
+.fwarn{font-size:12px;color:var(--ink2);margin-top:9px;padding-top:8px;
+  border-top:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -288,31 +316,36 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
   <div class="hubstat" id="hub-stat"></div>
   <p id="hub-msg"></p>
   <div class="tiles">
-    <button class="tile" data-go="log">
+    <button class="tile" data-go="food">
       <span class="tilen">01</span>
-      <span class="tilet">Log</span>
-      <span class="tiled">Stool, meals, weight — your daily entries</span>
+      <span class="tilet">Food</span>
+      <span class="tiled">Log meals, track macros, manage your food list</span>
+    </button>
+    <button class="tile" data-go="log">
+      <span class="tilen">02</span>
+      <span class="tilet">Stool</span>
+      <span class="tiled">Type, urgency, colour, notes</span>
     </button>
     <button class="tile" data-go="trends">
-      <span class="tilen">02</span>
+      <span class="tilen">03</span>
       <span class="tilet">Review</span>
       <span class="tiled">Trends, charts, correlation analysis</span>
     </button>
     <button class="tile" data-go="chat">
-      <span class="tilen">03</span>
+      <span class="tilen">04</span>
       <span class="tilet">Ask about your data</span>
       <span class="tiled">Talk through your history</span>
     </button>
   </div>
   <div class="minor">
+    <button data-go="body">Weight</button>
     <button data-go="labs">Blood work</button>
-    <button data-go="products">Packaged foods</button>
     <button data-go="supps">Supplements</button>
     <button data-go="settings">Settings</button>
   </div>
 </section>
 
-<!-- LOG -->
+<!-- STOOL -->
 <section id="s-log" class="screen">
   <h2>Stool</h2>
   <p class="sub">Pick the type that fits best.</p>
@@ -332,20 +365,90 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
   <label for="stool-note">Note</label>
   <textarea id="stool-note" placeholder="bloating, smell, floated..."></textarea>
   <button class="btn" data-act="saveStool">Save stool</button>
+</section>
 
-  <h3>Today</h3>
+<!-- FOOD -->
+<section id="s-food" class="screen">
+  <h2>Food</h2>
   <div id="daily-totals"></div>
 
-  <h3>Meal</h3>
-  <input type="text" id="meal-input" placeholder="Type an item and press Enter" autocomplete="off">
+  <h3>Log a meal</h3>
+  <input type="text" id="meal-input" placeholder="Search your foods, or type anything" autocomplete="off">
   <div id="meal-suggest"></div>
-  <div id="meal-chips"></div>
   <div class="pills" id="meal-recent"></div>
+  <div id="meal-chips"></div>
   <label for="meal-time">When</label>
   <input type="datetime-local" id="meal-time">
-  <button class="btn ghost" data-act="saveMeal">Save meal</button>
+  <button class="btn" data-act="saveMeal">Save meal</button>
 
-  <h3>Measurements</h3>
+  <h3>Add a new food</h3>
+  <div class="methodtabs" id="method-tabs">
+    <button class="mtab on" data-fmethod="barcode">Barcode</button>
+    <button class="mtab" data-fmethod="photo">Label photo</button>
+    <button class="mtab" data-fmethod="manual">By hand</button>
+  </div>
+
+  <div id="fm-barcode" class="fmethod on">
+    <div class="two">
+      <input type="text" id="prod-barcode" inputmode="numeric" placeholder="type the number">
+      <button class="btn ghost" data-act="lookup" style="margin-top:0">Look up</button>
+    </div>
+    <label for="barcode-input">Or photo of the barcode</label>
+    <input type="file" id="barcode-input" accept="image/*">
+    <p class="disclaim">Searches Open Food Facts, a community database. Entries are user-contributed
+    and are sometimes wrong, outdated, or for a different variant — check every number against
+    the package before saving.</p>
+  </div>
+
+  <div id="fm-photo" class="fmethod">
+    <label for="label-input">Photo of the nutrition label</label>
+    <input type="file" id="label-input" accept="image/*">
+    <p class="disclaim">Reads the ingredient list and the per-serving numbers in one go.
+    Needs the Worker URL set in Settings.</p>
+  </div>
+
+  <div id="fm-manual" class="fmethod">
+    <p class="disclaim">Fill in whatever you know. Nutrition is optional — a food with no
+    numbers still works for correlation analysis.</p>
+  </div>
+
+  <p id="prod-step" class="disclaim"></p>
+
+  <div id="prod-common">
+    <label for="prod-name">Name you will type when logging</label>
+    <input type="text" id="prod-name" placeholder="e.g. quest bar chocolate">
+
+    <label for="prod-serving">One serving is</label>
+    <input type="text" id="prod-serving" placeholder="1 bar (60 g)">
+
+    <label>Per serving</label>
+    <div class="four">
+      <input type="number" step="any" id="nut-kcal" placeholder="kcal">
+      <input type="number" step="any" id="nut-protein" placeholder="protein">
+      <input type="number" step="any" id="nut-carbs" placeholder="carbs">
+      <input type="number" step="any" id="nut-fat" placeholder="fat">
+    </div>
+    <div class="two" style="margin-top:6px">
+      <input type="number" step="any" id="nut-fiber" placeholder="fiber">
+      <input type="number" step="any" id="nut-sugars" placeholder="sugars">
+    </div>
+
+    <label for="prod-ingredients">Ingredient list</label>
+    <textarea id="prod-ingredients" placeholder="Ingredients: milk protein isolate, almonds, maltitol..."></textarea>
+    <button class="btn ghost" data-act="parseProd">Read ingredients</button>
+
+    <div id="prod-preview" class="cklist" style="margin-top:14px"></div>
+    <button class="btn" data-act="saveProd" id="prod-save">Save food</button>
+  </div>
+
+  <h3>My foods</h3>
+  <div id="prod-list"></div>
+</section>
+
+<!-- BODY -->
+<section id="s-body" class="screen">
+  <h2>Weight</h2>
+  <p class="sub">Switch units any time — the history converts with you.</p>
   <div id="metric-list"></div>
   <div class="two">
     <select id="metric-select"></select>
@@ -353,7 +456,7 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
   </div>
   <div class="pills" id="unit-toggle"></div>
   <input type="datetime-local" id="metric-time">
-  <button class="btn ghost" data-act="saveMetric">Save measurement</button>
+  <button class="btn" data-act="saveMetric">Save measurement</button>
   <button class="mini" data-act="addCustom" style="margin-top:10px">+ custom measurement</button>
 </section>
 
@@ -416,57 +519,6 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 
   <h3>History</h3>
   <div id="lab-list"></div>
-</section>
-
-<!-- PACKAGED FOODS -->
-<section id="s-products" class="screen">
-  <h2>Packaged foods</h2>
-  <p class="sub">Save a bar or ready meal once, with its ingredient list. After that you log it
-  by name and the app tracks its ingredient groups underneath.</p>
-
-  <label for="prod-name">Name you will type when logging</label>
-  <input type="text" id="prod-name" placeholder="e.g. quest bar chocolate">
-
-  <h3>Barcode</h3>
-  <div class="two">
-    <input type="text" id="prod-barcode" inputmode="numeric" placeholder="type the number">
-    <button class="btn ghost" data-act="lookup" style="margin-top:0">Look up</button>
-  </div>
-  <label for="barcode-input">Or photo of the barcode</label>
-  <input type="file" id="barcode-input" accept="image/*">
-  <p class="disclaim">Looks the product up in Open Food Facts, a community database.
-  Entries are contributed by users and are sometimes wrong or missing — always check
-  the numbers against the package.</p>
-
-  <h3>Label</h3>
-  <label for="label-input">Photo of the nutrition label</label>
-  <input type="file" id="label-input" accept="image/*">
-  <p id="prod-step" class="disclaim"></p>
-
-  <label for="prod-serving">Serving size as printed</label>
-  <input type="text" id="prod-serving" placeholder="1 bar (60 g)">
-
-  <label>Per serving</label>
-  <div class="four">
-    <input type="number" step="any" id="nut-kcal" placeholder="kcal">
-    <input type="number" step="any" id="nut-protein" placeholder="protein">
-    <input type="number" step="any" id="nut-carbs" placeholder="carbs">
-    <input type="number" step="any" id="nut-fat" placeholder="fat">
-  </div>
-  <div class="two" style="margin-top:6px">
-    <input type="number" step="any" id="nut-fiber" placeholder="fiber">
-    <input type="number" step="any" id="nut-sugars" placeholder="sugars">
-  </div>
-
-  <label for="prod-ingredients">Ingredient text</label>
-  <textarea id="prod-ingredients" placeholder="Ingredients: milk protein isolate, soluble corn fiber, almonds..."></textarea>
-  <button class="btn ghost" data-act="parseProd">Read ingredients</button>
-
-  <div id="prod-preview" class="cklist" style="margin-top:14px"></div>
-  <button class="btn" data-act="saveProd" id="prod-save" style="display:none">Save product</button>
-
-  <h3>Saved</h3>
-  <div id="prod-list"></div>
 </section>
 
 <!-- SUPPLEMENTS -->
@@ -2122,8 +2174,10 @@ function go(screen){
   if(screen==='trends') renderTrends();
   if(screen==='labs') renderLabs();
   if(screen==='supps') renderSupps();
-  if(screen==='products') renderProducts();
-  if(screen==='log'){ renderLog(); renderDaily(); }
+
+  if(screen==='log') renderLog();
+  if(screen==='food'){ renderFood(); }
+  if(screen==='body'){ renderMetrics(); }
   if(screen==='hub') renderHub();
 }
 
@@ -2186,7 +2240,6 @@ function renderLog(){
   el('chk-blood').checked = stoolDraft.blood;
   el('chk-pain').checked = stoolDraft.painWakesAtNight;
   checkFlags();
-  renderMealChips();
 }
 
 function checkFlags(){
@@ -2215,42 +2268,85 @@ function saveStool(){
   });
 }
 
+/* ---------- FOOD SCREEN ---------- */
+function renderFood(){
+  renderDaily();
+  renderMealChips();
+  renderProducts();
+}
+
+function setFoodMethod(m){
+  ['barcode','photo','manual'].forEach(function(k){
+    var pane = el('fm-'+k);
+    if(pane) pane.classList.toggle('on', k===m);
+  });
+  var tabs = document.querySelectorAll('.mtab');
+  for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on', tabs[i].dataset.fmethod===m);
+  el('prod-step').textContent='';
+}
+
 /* ---------- LOG: MEAL ---------- */
 var mealDraft = [];
 var mealPortions = {};
 function renderMealChips(){
   var pm = productMap();
-  el('meal-chips').innerHTML = mealDraft.map(function(m,i){
+  var box = el('meal-chips');
+  if(!box) return;
+
+  box.innerHTML = mealDraft.length ? mealDraft.map(function(m,i){
     var p = pm[m];
     var hasNut = p && p.nutrition && p.nutrition.kcal!=null;
     var port = mealPortions[m];
-    return '<div class="chiprow"><span class="chip">'+esc(m)+
-      '<button data-rmchip="'+i+'">×</button></span>'+
-      (hasNut
-        ? '<span class="portwrap"><input class="portin" type="number" step="0.25" min="0" '+
-          'data-port="'+esc(m)+'" value="'+(port==null?'':port)+'" placeholder="qty">'+
-          '<span class="portlbl">× '+esc(p.servingLabel||'serving')+'</span>'+
-          (port ? '<span class="portkcal">'+Math.round(p.nutrition.kcal*port)+' kcal</span>' : '')+
-          '</span>'
-        : '')+
+
+    if(!hasNut){
+      return '<div class="fitem"><div class="fhead"><span class="fname">'+esc(m)+'</span>'+
+        '<button class="frm" data-rmchip="'+i+'">×</button></div>'+
+        '<div class="fnone">No nutrition data — still counted for correlation</div></div>';
+    }
+
+    var quick = [0.5,1,1.5,2].map(function(q){
+      return '<button class="qp'+(port===q?' on':'')+'" data-setport="'+esc(m)+'|'+q+'">'+
+        (q===0.5?'\u00bd':(q===1.5?'1\u00bd':q))+'</button>';
+    }).join('');
+
+    return '<div class="fitem"><div class="fhead"><span class="fname">'+esc(m)+'</span>'+
+      '<button class="frm" data-rmchip="'+i+'">×</button></div>'+
+      '<div class="fserv">1 serving = '+esc(p.servingLabel||'1 serving')+
+        ' · '+p.nutrition.kcal+' kcal</div>'+
+      '<div class="fportion"><span class="fq">How many?</span>'+quick+
+        '<input class="portin" type="number" step="0.25" min="0" data-port="'+esc(m)+'" '+
+        'value="'+(port==null?'':port)+'" placeholder="other"></div>'+
+      (port ? '<div class="ftot">'+Math.round(p.nutrition.kcal*port)+' kcal · '+
+        'P '+Math.round((p.nutrition.protein||0)*port*10)/10+
+        ' · C '+Math.round((p.nutrition.carbs||0)*port*10)/10+
+        ' · F '+Math.round((p.nutrition.fat||0)*port*10)/10+'</div>'
+        : '<div class="fwarn">Pick a portion or it will not count toward today</div>')+
       '</div>';
-  }).join('') || '<span class="muted">No items yet</span>';
+  }).join('') : '<span class="muted">No items yet</span>';
 
   var top = itemHistory().filter(function(h){
     return mealDraft.indexOf(h.item)===-1;
   }).slice(0,12);
-  el('meal-recent').innerHTML = top.length
+  var rec = el('meal-recent');
+  if(rec) rec.innerHTML = top.length
     ? top.map(function(h){
         return '<button class="pill sm" data-addchip="'+esc(h.item)+'">'+esc(h.item)+'</button>';
       }).join('')
     : '';
 }
+
+function setPortion(item, q){
+  if(mealPortions[item]===q) delete mealPortions[item];
+  else mealPortions[item]=q;
+  renderMealChips();
+}
+
 function addChip(v){
   v = (v||'').trim().toLowerCase();
   if(!v) return;
   if(mealDraft.indexOf(v)===-1) mealDraft.push(v);
   el('meal-input').value='';
-  el('meal-suggest').innerHTML='';
+  var sg = el('meal-suggest'); if(sg) sg.innerHTML='';
   renderMealChips();
 }
 
@@ -2294,7 +2390,7 @@ function saveMeal(){
     STATE.meals.push(rec);
     STATE.meals.sort(function(a,b){ return new Date(a.at)-new Date(b.at); });
     mealDraft = []; mealPortions = {};
-    renderMealChips(); renderDaily(); toast('Saved');
+    renderFood(); toast('Saved');
   });
 }
 
@@ -3106,7 +3202,7 @@ function toast(msg){
 
 /* ---------- EVENT DELEGATION (no inline onclick — Safari) ---------- */
 document.addEventListener('click', function(e){
-  var t = e.target.closest ? e.target.closest('[data-go],[data-bris],[data-opt],[data-addchip],[data-rmchip],[data-stop],[data-delsupp],[data-unit],[data-delprod],[data-rmtag],[data-act]') : null;
+  var t = e.target.closest ? e.target.closest('[data-go],[data-bris],[data-opt],[data-addchip],[data-rmchip],[data-stop],[data-delsupp],[data-unit],[data-delprod],[data-rmtag],[data-setport],[data-fmethod],[data-act]') : null;
   if(!t) return;
   var d = t.dataset;
   if(d.go) go(d.go);
@@ -3114,10 +3210,13 @@ document.addEventListener('click', function(e){
   else if(d.opt){ stoolDraft[d.opt] = d.opt==='color' ? d.val : parseInt(d.val,10); renderLog(); }
   else if(d.delprod){ dbDel('products',d.delprod,function(){
       STATE.products = STATE.products.filter(function(p){return p.id!==d.delprod;}); renderProducts(); }); }
+  else if(d.setport){ var sp=d.setport.split('|'); setPortion(sp[0], parseFloat(sp[1])); }
+  else if(d.fmethod){ setFoodMethod(d.fmethod); }
   else if(d.rmtag){ prodDraft.tags = prodDraft.tags.filter(function(x){return x!==d.rmtag;}); showProdPreview(); }
   else if(d.unit){ var p=d.unit.split('|'); setMetricUnit(p[0],p[1]); }
   else if(d.addchip) addChip(d.addchip);
-  else if(d.rmchip){ mealDraft.splice(parseInt(d.rmchip,10),1); renderMealChips(); }
+  else if(d.rmchip){ var rm=mealDraft.splice(parseInt(d.rmchip,10),1)[0];
+      delete mealPortions[rm]; renderMealChips(); }
   else if(d.stop) stopSupp(d.stop);
   else if(d.delsupp){ dbDel('supps',d.delsupp,function(){ STATE.supps = STATE.supps.filter(function(s){return s.id!==d.delsupp;}); renderSupps(); }); }
   else if(d.act){
@@ -3135,7 +3234,7 @@ function boot(){
     loadAll(function(){
       STATE.stools.sort(function(a,b){return new Date(a.at)-new Date(b.at);});
       STATE.meals.sort(function(a,b){return new Date(a.at)-new Date(b.at);});
-      renderAnalyteSelect(); renderMetrics(); renderSettings(); setupMask(); renderSupps(); renderProducts(); renderGoalInputs(); renderDaily();
+      renderAnalyteSelect(); renderMetrics(); renderSettings(); setupMask(); renderSupps(); renderProducts(); renderGoalInputs();
       el('stool-time').value = todayISO();
       el('meal-time').value = todayISO();
       el('metric-time').value = todayISO();
@@ -3163,15 +3262,9 @@ function boot(){
     if(!p) return;
     var v = parseFloat(e.target.value);
     if(isNaN(v)||v<=0) delete mealPortions[p]; else mealPortions[p]=v;
-    var pm = productMap(), pr = pm[p];
-    var box = e.target.parentNode.querySelector('.portkcal');
-    if(pr && pr.nutrition && pr.nutrition.kcal!=null){
-      var kc = mealPortions[p] ? Math.round(pr.nutrition.kcal*mealPortions[p])+' kcal' : '';
-      if(box) box.textContent = kc;
-      else if(kc){ var sp=document.createElement('span'); sp.className='portkcal'; sp.textContent=kc; e.target.parentNode.appendChild(sp); }
-    }
+    clearTimeout(window.__portT);
+    window.__portT = setTimeout(renderMealChips, 500);
   });
-  el('import-input').addEventListener('change', function(){ if(this.files[0]) doImport(this.files[0]); });
   el('backbtn').addEventListener('click', function(){ go('hub'); });
 }
 
