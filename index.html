@@ -364,6 +364,11 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 
 .brand{font:400 11px var(--mono);color:var(--ink2);margin-left:7px}
 .sugg .brand{display:inline-block}
+
+.fpick.inmeal{background:#E6EFF7;border-color:var(--deep)}
+.fpick.isrec.inmeal{background:#F0E9F6}
+.fpqty{font:600 12px var(--mono);color:#fff;background:var(--deep);
+  border-radius:20px;padding:3px 9px;flex:none}
 </style>
 </head>
 <body>
@@ -2557,20 +2562,31 @@ function renderMealChips(){
 function setPortion(item, q){
   if(mealPortions[item]===q) delete mealPortions[item];
   else mealPortions[item]=q;
-  renderMealChips();
+  renderMealChips(); renderFoodPicker();
 }
 
 function addChip(v){
   v = (v||'').trim().toLowerCase();
   if(!v) return;
-  if(mealDraft.indexOf(v)===-1) mealDraft.push(v);
+
+  var p = productMap()[v];
+  var hasNut = p && p.nutrition && p.nutrition.kcal!=null;
+
+  if(mealDraft.indexOf(v)===-1){
+    mealDraft.push(v);
+    // One tap means one serving. Leaving it blank made the commonest
+    // case take two actions instead of one.
+    if(hasNut) mealPortions[v] = 1;
+  } else if(hasNut){
+    mealPortions[v] = Math.round(((mealPortions[v]||0) + 1) * 100) / 100;
+  } else {
+    toast('Already in this meal');
+    return;
+  }
+
   renderMealChips(); renderFoodPicker();
 }
 
-/* Historia skladnikow, posortowana po czestosci uzycia.
-   Wazne dla jakosci danych: jesli raz wpiszesz "milk", a raz "mleko",
-   silnik korelacji potraktuje je jako dwa rozne skladniki i rozmyje
-   sygnal. Podpowiedzi wymuszaja spojne nazewnictwo. */
 function itemHistory(){
   var used = {};
   STATE.meals.forEach(function(m){
@@ -2586,16 +2602,18 @@ function itemHistory(){
 /* No search box: the whole saved library is shown, grouped by first
    letter, with foods and recipes visually distinct. For a personal
    library of a few dozen items, scanning beats typing. */
+/* The picker is a permanent shortcut bar, not a to-do list: every
+   saved item stays visible at all times. Tapping one already in the
+   meal adds another serving, so three taps on milk means three
+   glasses. */
 function renderFoodPicker(){
   var box = el('food-picker');
   if(!box) return;
-  var items = itemHistory().filter(function(h){
-    return mealDraft.indexOf(h.item)===-1;
-  }).sort(function(a,b){ return a.item.localeCompare(b.item); });
+  var items = itemHistory().sort(function(a,b){ return a.item.localeCompare(b.item); });
 
   if(!items.length){
     box.innerHTML = '<div class="nohit">Nothing saved yet. Set up your first food below — '+
-      'after that it appears here and you log it with one tap.</div>';
+      'after that it stays here and you log it with one tap.</div>';
     return;
   }
 
@@ -2610,10 +2628,14 @@ function renderFoodPicker(){
     Object.keys(groups).sort().map(function(L){
       return '<div class="alpha"><div class="alphaL">'+esc(L)+'</div>'+
         '<div class="alphaitems">'+groups[L].map(function(h){
-          return '<button class="fpick '+(h.kind==='recipe'?'isrec':'isfood')+'" '+
-            'data-addchip="'+esc(h.item)+'">'+
-            '<span class="fpname">'+esc(h.item)+'</span>'+
-            '<span class="fpkcal">'+(h.kcal!=null?h.kcal+' kcal':'—')+'</span></button>';
+          var inMeal = mealDraft.indexOf(h.item)!==-1;
+          var qty = mealPortions[h.item];
+          var badge = inMeal
+            ? '<span class="fpqty">'+(qty ? '\u00d7'+qty : 'added')+'</span>'
+            : '<span class="fpkcal">'+(h.kcal!=null?h.kcal+' kcal':'\u2014')+'</span>';
+          return '<button class="fpick '+(h.kind==='recipe'?'isrec':'isfood')+
+            (inMeal?' inmeal':'')+'" data-addchip="'+esc(h.item)+'">'+
+            '<span class="fpname">'+esc(h.item)+'</span>'+badge+'</button>';
         }).join('')+'</div></div>';
     }).join('');
 }
@@ -3857,7 +3879,7 @@ document.addEventListener('click', function(e){
   else if(d.unit){ var p=d.unit.split('|'); setMetricUnit(p[0],p[1]); }
   else if(d.addchip) addChip(d.addchip);
   else if(d.rmchip){ var rm=mealDraft.splice(parseInt(d.rmchip,10),1)[0];
-      delete mealPortions[rm]; renderMealChips(); }
+      delete mealPortions[rm]; renderMealChips(); renderFoodPicker(); }
   else if(d.stop) stopSupp(d.stop);
   else if(d.delsupp){ dbDel('supps',d.delsupp,function(){ STATE.supps = STATE.supps.filter(function(s){return s.id!==d.delsupp;}); renderSupps(); }); }
   else if(d.act){
@@ -3919,7 +3941,7 @@ function boot(){
     var v = parseFloat(e.target.value);
     if(isNaN(v)||v<=0) delete mealPortions[p]; else mealPortions[p]=v;
     clearTimeout(window.__portT);
-    window.__portT = setTimeout(renderMealChips, 500);
+    window.__portT = setTimeout(function(){ renderMealChips(); renderFoodPicker(); }, 500);
   });
   el('backbtn').addEventListener('click', function(){ go('hub'); });
 }
