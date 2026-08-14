@@ -333,6 +333,37 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 #ri-suggest{display:grid;gap:3px;margin-top:8px}
 #rec-tail{margin-top:20px;border-top:1px solid var(--line);padding-top:4px}
 .sugg .rbadge{margin-left:6px}
+
+/* --- food picker --- */
+#food-picker{margin:10px 0 16px}
+.fplegend{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink2);
+  margin-bottom:10px}
+.fplegend .key{width:10px;height:10px;border-radius:2px;display:inline-block}
+.fplegend .key.isfood{background:var(--deep2)}
+.fplegend .key.isrec{background:#8A5AA8;margin-left:10px}
+.alpha{display:grid;grid-template-columns:22px 1fr;gap:8px;margin-bottom:8px}
+.alphaL{font:600 13px var(--mono);color:var(--ink2);padding-top:11px}
+.alphaitems{display:grid;gap:5px}
+.fpick{display:flex;justify-content:space-between;align-items:center;gap:10px;
+  background:var(--card);border:1px solid var(--line);border-left-width:3px;
+  border-radius:var(--r);padding:11px 12px;cursor:pointer;text-align:left;width:100%}
+.fpick.isfood{border-left-color:var(--deep2)}
+.fpick.isrec{border-left-color:#8A5AA8;background:#F7F4FA}
+.fpick:hover{border-color:var(--deep)}
+.fpname{font-size:14.5px;font-weight:500;text-transform:capitalize}
+.fpkcal{font:500 12px var(--mono);color:var(--ink2);flex:none}
+/* --- goal maths --- */
+.gmath{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);
+  padding:11px 13px;margin-top:12px}
+.gmrow{display:flex;justify-content:space-between;font-size:13px;padding:4px 0}
+.gmrow.gmtot{border-top:1px solid var(--line);margin-top:5px;padding-top:7px;font-weight:600}
+.gmok,.gmbad{font-size:12.5px;line-height:1.5;margin-top:9px;padding-left:9px;
+  border-left:2px solid var(--ok)}
+.gmbad{border-left-color:var(--signal);color:var(--signal)}
+.gmok .mini,.gmbad .mini{display:block;margin-top:8px}
+
+.brand{font:400 11px var(--mono);color:var(--ink2);margin-left:7px}
+.sugg .brand{display:inline-block}
 </style>
 </head>
 <body>
@@ -407,14 +438,13 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
   <div id="goal-editor" style="display:none">
     <p class="muted">Leave a field blank to track the total without a target.</p>
     <div id="goal-fields" class="two"></div>
+    <div id="goal-math"></div>
     <button class="btn ghost" data-act="saveGoals">Save goals</button>
   </div>
 
   <h3>What did you eat?</h3>
-  <p class="sub">Type a name. Foods you have set up will suggest themselves.</p>
-  <input type="text" id="meal-input" placeholder="Search your foods, or type anything" autocomplete="off">
-  <div id="meal-suggest"></div>
-  <div class="pills" id="meal-recent"></div>
+  <p class="sub">Tap what you ate. Everything you have set up shows up here.</p>
+  <div id="food-picker"></div>
   <div id="meal-chips"></div>
   <label for="meal-time">When</label>
   <input type="datetime-local" id="meal-time">
@@ -432,7 +462,7 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 
   <div id="fm-barcode" class="fmethod on">
     <div class="two">
-      <input type="text" id="prod-barcode" inputmode="numeric" placeholder="type the number">
+      <input type="text" id="prod-barcode" placeholder="barcode number or product name">
       <button class="btn ghost" data-act="lookup" style="margin-top:0">Look up</button>
     </div>
     <label for="barcode-input">Or photo of the barcode</label>
@@ -478,7 +508,7 @@ button.ptag.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 
       <div id="im-barcode" class="fmethod">
         <div class="two">
-          <input type="text" id="ri-barcode" inputmode="numeric" placeholder="type the number">
+          <input type="text" id="ri-barcode" placeholder="barcode number or product name">
           <button class="btn ghost" data-act="ingLookup" style="margin-top:0">Look up</button>
         </div>
         <label for="ri-bcphoto">Or photo of the barcode</label>
@@ -1356,8 +1386,11 @@ function dailyTotals(meals, products, dayISO){
 /* Open Food Facts -> our shape. Public API, no key, CORS open,
    so this works even when the Worker is not configured. */
 function offToProduct(json){
-  if(!json || json.status !== 1 || !json.product) return null;
-  var p = json.product;
+  // status has been 1, "1", and "success" across API versions.
+  // The only thing that actually matters is whether a product came back.
+  if(!json) return null;
+  var p = json.product || (json.products && json.products[0]);
+  if(!p) return null;
   var n = p.nutriments || {};
   var qty = parseFloat(p.serving_quantity);
   var basis = (qty && qty > 0) ? qty/100 : 1;
@@ -1383,6 +1416,21 @@ function offToProduct(json){
     },
     source: 'openfoodfacts'
   };
+}
+
+/* Atwater factors. Protein and carbs 4 kcal/g, fat 9 kcal/g.
+   Fibre is inside the carb figure on most labels, so it is not
+   added again here. */
+var KCAL_PER_G = { protein:4, carbs:4, fat:9 };
+
+function kcalFromMacros(m){
+  if(!m) return 0;
+  var t = 0;
+  Object.keys(KCAL_PER_G).forEach(function(k){
+    var v = parseFloat(m[k]);
+    if(!isNaN(v)) t += v * KCAL_PER_G[k];
+  });
+  return Math.round(t);
 }
 
 /* ---------------------------------------- */
@@ -2446,6 +2494,7 @@ function saveStool(){
 function renderFood(){
   renderDaily();
   renderMealChips();
+  renderFoodPicker();
   renderProducts();
 }
 
@@ -2503,15 +2552,6 @@ function renderMealChips(){
       '</div>';
   }).join('') : '<span class="muted">No items yet</span>';
 
-  var top = itemHistory().filter(function(h){
-    return mealDraft.indexOf(h.item)===-1;
-  }).slice(0,12);
-  var rec = el('meal-recent');
-  if(rec) rec.innerHTML = top.length
-    ? top.map(function(h){
-        return '<button class="pill sm" data-addchip="'+esc(h.item)+'">'+esc(h.item)+'</button>';
-      }).join('')
-    : '';
 }
 
 function setPortion(item, q){
@@ -2524,9 +2564,7 @@ function addChip(v){
   v = (v||'').trim().toLowerCase();
   if(!v) return;
   if(mealDraft.indexOf(v)===-1) mealDraft.push(v);
-  el('meal-input').value='';
-  var sg = el('meal-suggest'); if(sg) sg.innerHTML='';
-  renderMealChips();
+  renderMealChips(); renderFoodPicker();
 }
 
 /* Historia skladnikow, posortowana po czestosci uzycia.
@@ -2545,27 +2583,39 @@ function itemHistory(){
   }).sort(function(a,b){ return b.n-a.n || a.item.localeCompare(b.item); });
 }
 
-function renderSuggestions(q){
-  q = (q||'').trim().toLowerCase();
-  var box = el('meal-suggest');
+/* No search box: the whole saved library is shown, grouped by first
+   letter, with foods and recipes visually distinct. For a personal
+   library of a few dozen items, scanning beats typing. */
+function renderFoodPicker(){
+  var box = el('food-picker');
   if(!box) return;
-  if(!q){ box.innerHTML=''; return; }
-  var hits = itemHistory().filter(function(h){
-    return h.item.indexOf(q)!==-1 && mealDraft.indexOf(h.item)===-1;
-  }).slice(0,8);
+  var items = itemHistory().filter(function(h){
+    return mealDraft.indexOf(h.item)===-1;
+  }).sort(function(a,b){ return a.item.localeCompare(b.item); });
 
-  if(!hits.length){
-    box.innerHTML = '<div class="nohit">Nothing saved matches that. Set it up below, '+
-      'or press Enter to log just the name (counts for correlation, not calories).</div>';
+  if(!items.length){
+    box.innerHTML = '<div class="nohit">Nothing saved yet. Set up your first food below — '+
+      'after that it appears here and you log it with one tap.</div>';
     return;
   }
-  box.innerHTML = hits.map(function(h){
-    var i = h.item.indexOf(q);
-    var marked = esc(h.item.slice(0,i))+'<b>'+esc(h.item.slice(i,i+q.length))+'</b>'+esc(h.item.slice(i+q.length));
-    return '<button class="sugg" data-addchip="'+esc(h.item)+'">'+
-      '<span>'+marked+(h.kind==='recipe'?'<span class="rbadge">recipe</span>':'')+'</span>'+
-      '<span class="suggn">'+(h.kcal!=null?h.kcal+' kcal':'no data')+'</span></button>';
-  }).join('');
+
+  var groups = {};
+  items.forEach(function(h){
+    var L = h.item.charAt(0).toUpperCase();
+    (groups[L] = groups[L] || []).push(h);
+  });
+
+  box.innerHTML = '<div class="fplegend"><span class="key isfood"></span>food'+
+      '<span class="key isrec"></span>recipe</div>' +
+    Object.keys(groups).sort().map(function(L){
+      return '<div class="alpha"><div class="alphaL">'+esc(L)+'</div>'+
+        '<div class="alphaitems">'+groups[L].map(function(h){
+          return '<button class="fpick '+(h.kind==='recipe'?'isrec':'isfood')+'" '+
+            'data-addchip="'+esc(h.item)+'">'+
+            '<span class="fpname">'+esc(h.item)+'</span>'+
+            '<span class="fpkcal">'+(h.kcal!=null?h.kcal+' kcal':'—')+'</span></button>';
+        }).join('')+'</div></div>';
+    }).join('');
 }
 
 function saveMeal(){
@@ -2638,12 +2688,70 @@ function saveGoals(){
   el('goal-editor').style.display='none';
   renderDaily(); toast('Goals saved');
 }
+
+/* Macros and calories are not independent numbers. Typing 150 g of
+   protein commits you to 600 kcal whether you meant to or not, so
+   the arithmetic is shown live and contradictions are called out
+   instead of being stored silently. */
+function renderGoalMath(){
+  var box = el('goal-math');
+  if(!box || !el('goal-protein')) return;
+  var m = {};
+  ['protein','carbs','fat'].forEach(function(k){ m[k]=el('goal-'+k).value; });
+  var fromMacros = kcalFromMacros(m);
+  var stated = parseFloat(el('goal-kcal').value);
+
+  if(!fromMacros){
+    box.innerHTML = '<div class="msub">Enter protein, carbs or fat and the calorie maths appears here.</div>';
+    return;
+  }
+
+  var parts = ['protein','carbs','fat'].filter(function(k){ return parseFloat(m[k])>0; })
+    .map(function(k){
+      var g = parseFloat(m[k]);
+      var lbl = k==='protein'?'Protein':(k==='carbs'?'Carbs':'Fat');
+      return '<div class="gmrow"><span>'+lbl+' '+g+' g × '+KCAL_PER_G[k]+'</span>'+
+             '<span class="nval">'+Math.round(g*KCAL_PER_G[k])+'</span></div>';
+    }).join('');
+
+  var verdict;
+  if(!isNaN(stated) && stated>0){
+    var diff = stated - fromMacros;
+    if(Math.abs(diff)/stated < 0.03){
+      verdict = '<div class="gmok">Your macros add up to your calorie target.</div>';
+    } else if(diff > 0){
+      verdict = '<div class="gmbad">Your macros account for '+fromMacros+' kcal — '+
+        Math.round(diff)+' short of the '+stated+' you set. Raise a macro or lower the target.'+
+        '<button class="mini" data-act="syncKcal">Set calories to '+fromMacros+'</button></div>';
+    } else {
+      verdict = '<div class="gmbad">Your macros come to '+fromMacros+' kcal, '+
+        Math.abs(Math.round(diff))+' over the '+stated+' you set. Both cannot be true.'+
+        '<button class="mini" data-act="syncKcal">Set calories to '+fromMacros+'</button></div>';
+    }
+  } else {
+    verdict = '<div class="gmok">That is '+fromMacros+' kcal in total.'+
+      '<button class="mini" data-act="syncKcal">Use as calorie goal</button></div>';
+  }
+
+  box.innerHTML = '<div class="gmath">'+parts+
+    '<div class="gmrow gmtot"><span>From macros</span>'+
+    '<span class="nval">'+fromMacros+' kcal</span></div></div>'+verdict;
+}
+
+function syncKcalGoal(){
+  var m = {};
+  ['protein','carbs','fat'].forEach(function(k){ m[k]=el('goal-'+k).value; });
+  el('goal-kcal').value = kcalFromMacros(m);
+  renderGoalMath();
+}
+
 function renderGoalInputs(){
   var g = goals();
   el('goal-fields').innerHTML = NUTRIENTS.map(function(n){
     return '<div><label for="goal-'+n.key+'">'+esc(n.label)+' ('+esc(n.unit)+')</label>'+
       '<input type="number" step="any" id="goal-'+n.key+'" value="'+(g[n.key]==null?'':g[n.key])+'"></div>';
   }).join('');
+  renderGoalMath();
 }
 
 /* ---------- METRICS (weight + custom) ---------- */
@@ -3096,7 +3204,11 @@ function saveProduct(){
 /* Photo of an ingredient label -> text. Same Worker path as lab photos. */
 function readLabelPhoto(file){
   var ep = STATE.settings.endpoint;
-  if(!ep){ toast('Set your Worker URL in Settings first'); go('settings'); return; }
+  if(!ep){
+    el('prod-step').innerHTML = 'Reading labels needs the Worker URL. Open Settings and paste it. '+
+      'Barcode search and manual entry work without it.';
+    return;
+  }
   var fr = new FileReader();
   fr.onload = function(){
     var b64 = fr.result.split(',')[1];
@@ -3128,7 +3240,10 @@ function readLabelPhoto(file){
       });
       el('prod-step').textContent = 'Read it. Check every number against the label before saving.';
       if(parsed.ingredients) parseProductText(); else showProdPreview();
-    }).catch(function(){ el('prod-step').textContent='Could not read it. Type it in.'; });
+    }).catch(function(err){
+      el('prod-step').textContent='Could not reach the Worker ('+(err&&err.message?err.message:'network error')+
+        '). Check Settings, or type the numbers in.';
+    });
   };
   fr.readAsDataURL(file);
 }
@@ -3273,25 +3388,71 @@ function addIngredientFromFields(){
   });
 }
 
-function ingLookupBarcode(){
-  var code = (el('ri-barcode').value||'').replace(/\D/g,'');
-  if(code.length<8){ toast('Barcode looks too short'); return; }
-  el('ri-step').textContent='Looking up '+code+'...';
-  fetch('https://world.openfoodfacts.org/api/v2/product/'+code+
-        '.json?fields=product_name,nutriments,ingredients_text,serving_size,serving_quantity')
+/* Accepts either a barcode or a product name. Typing a name used to
+   silently strip to an empty string and report "too short", which is
+   how a working feature looked broken. */
+function offSearch(term, onPick, stepId){
+  var step = function(msg){ el(stepId).textContent = msg; };
+  term = (term||'').trim();
+  if(!term){ step('Type a barcode or a product name.'); return; }
+
+  var digits = term.replace(/\D/g,'');
+  var isBarcode = digits.length >= 8 && digits.length === term.replace(/[\s-]/g,'').length;
+
+  if(isBarcode){
+    step('Looking up '+digits+'...');
+    fetch('https://world.openfoodfacts.org/api/v2/product/'+digits+
+          '.json?fields=product_name,brands,nutriments,ingredients_text,serving_size,serving_quantity')
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        var p = offToProduct(j);
+        if(!p){ step('That barcode is not in Open Food Facts. Try the product name, the label photo, or fill it in by hand.'); return; }
+        onPick(p); step('Found. Check the numbers against the package.');
+      })
+      .catch(function(){ step('Lookup failed. Check your connection.'); });
+    return;
+  }
+
+  step('Searching for "'+term+'"...');
+  fetch('https://world.openfoodfacts.org/cgi/search.pl?search_terms='+
+        encodeURIComponent(term)+'&search_simple=1&action=process&json=1&page_size=12'+
+        '&fields=code,product_name,brands,nutriments,ingredients_text,serving_size,serving_quantity')
     .then(function(r){ return r.json(); })
     .then(function(j){
-      var p = offToProduct(j);
-      if(!p){ el('ri-step').textContent='Not found. Try the label photo or fill it in by hand.'; return; }
-      fillIngFields(p);
-      el('ri-step').textContent='Found. Check the numbers against the package.';
+      var list = (j.products||[]).filter(function(p){
+        return p.product_name && p.nutriments && p.nutriments['energy-kcal_100g']!=null;
+      });
+      if(!list.length){ step('No match with nutrition data. Try the label photo or fill it in by hand.'); return; }
+      step('Pick the right one — names repeat across brands and sizes.');
+      window.__offHits = list;
+      el(stepId==='ri-step'?'ri-suggest':'prod-preview').innerHTML =
+        list.slice(0,8).map(function(p,idx){
+          var kc = Math.round(p.nutriments['energy-kcal_100g']);
+          return '<button class="sugg" data-offpick="'+idx+'">'+
+            '<span>'+esc(p.product_name)+
+            (p.brands?'<span class="brand">'+esc(String(p.brands).split(',')[0])+'</span>':'')+'</span>'+
+            '<span class="suggn">'+kc+' kcal/100g</span></button>';
+        }).join('');
+      window.__offPick = onPick;
     })
-    .catch(function(){ el('ri-step').textContent='Lookup failed. Check your connection.'; });
+    .catch(function(){ step('Search failed. Check your connection.'); });
+}
+
+function ingLookupBarcode(){
+  offSearch(el('ri-barcode').value, function(p){
+    fillIngFields(p); el('ri-suggest').innerHTML='';
+  }, 'ri-step');
 }
 
 function ingReadLabel(file){
   var ep = STATE.settings.endpoint;
-  if(!ep){ toast('Set your Worker URL in Settings first'); return; }
+  if(!ep){
+    el('ri-step').innerHTML = 'Reading labels needs the Worker URL. '+
+      'Open Settings and paste it, then come back. '+
+      'Barcode search and manual entry work without it.';
+    el('ri-fields').style.display='block';
+    return;
+  }
   var fr = new FileReader();
   fr.onload = function(){
     el('ri-step').textContent='Reading label...';
@@ -3309,13 +3470,26 @@ function ingReadLabel(file){
     }).then(function(r){ return r.json(); }).then(function(d){
       var txt=(d.content||[]).filter(function(i){return i.type==='text';}).map(function(i){return i.text;}).join('');
       txt = txt.replace(/```json|```/g,'').trim();
-      var j; try { j=JSON.parse(txt); } catch(e){ el('ri-step').textContent='Could not parse it. Fill it in by hand.'; return; }
+      if(d.error){ el('ri-step').textContent='The Worker returned an error: '+
+        (d.error.message||'unknown')+'. Check the URL and the API key.'; el('ri-fields').style.display='block'; return; }
+      var j; try { j=JSON.parse(txt); }
+      catch(e){
+        el('ri-step').textContent='Could not read the label. The fields are open — fill them in by hand.';
+        el('ri-fields').style.display='block'; return;
+      }
       var nut={};
       NUTRIENTS.forEach(function(n){ nut[n.key] = (typeof j[n.key]==='number') ? j[n.key] : null; });
       fillIngFields({ name:(j.name||'').toLowerCase(), servingLabel:j.servingLabel||'',
                       rawIngredients:j.ingredients||'', nutrition:nut });
-      el('ri-step').textContent='Read it. Check every number against the label.';
-    }).catch(function(){ el('ri-step').textContent='Could not read it. Fill it in by hand.'; });
+      var got = NUTRIENTS.filter(function(n){ return nut[n.key]!=null; }).length;
+      el('ri-step').textContent = got
+        ? 'Read '+got+' of '+NUTRIENTS.length+' values. Check them against the label and fill any gaps.'
+        : 'No numbers came back. Fill them in by hand.';
+    }).catch(function(err){
+      el('ri-step').textContent='Could not reach the Worker ('+(err&&err.message?err.message:'network error')+
+        '). Check the URL in Settings, or fill the fields in by hand.';
+      el('ri-fields').style.display='block';
+    });
   };
   fr.readAsDataURL(file);
 }
@@ -3374,26 +3548,16 @@ function editRecipe(id){
 }
 
 /* --- Open Food Facts lookup --- */
-function lookupBarcode(code){
-  code = (code||'').replace(/\D/g,'');
-  if(code.length < 8){ toast('Barcode looks too short'); return; }
-  el('prod-step').textContent = 'Looking up '+code+'...';
-  fetch('https://world.openfoodfacts.org/api/v2/product/'+code+
-        '.json?fields=product_name,nutriments,ingredients_text,serving_size,serving_quantity')
-    .then(function(r){ return r.json(); })
-    .then(function(j){
-      var p = offToProduct(j);
-      if(!p){ el('prod-step').textContent='Not in Open Food Facts. Use the label photo instead.'; return; }
-      if(p.name) el('prod-name').value = p.name;
-      el('prod-ingredients').value = p.ingredients.join(', ');
-      prodDraft.ingredients = p.ingredients;
-      prodDraft.tags = p.tags;
-      prodDraft.nutrition = p.nutrition;
-      prodDraft.servingLabel = p.servingLabel;
-      el('prod-step').textContent = 'Found. Check everything before saving — community data is not always right.';
-      showProdPreview();
-    })
-    .catch(function(){ el('prod-step').textContent='Lookup failed. Check your connection.'; });
+function lookupBarcode(){
+  offSearch(el('prod-barcode').value, function(p){
+    if(p.name) el('prod-name').value = p.name;
+    el('prod-ingredients').value = p.ingredients.join(', ');
+    prodDraft.ingredients = p.ingredients;
+    prodDraft.tags = p.tags;
+    prodDraft.nutrition = p.nutrition;
+    prodDraft.servingLabel = p.servingLabel;
+    showProdPreview();
+  }, 'prod-step');
 }
 
 /* Native barcode reading where the browser supports it.
@@ -3671,7 +3835,7 @@ function toast(msg){
 
 /* ---------- EVENT DELEGATION (no inline onclick — Safari) ---------- */
 document.addEventListener('click', function(e){
-  var t = e.target.closest ? e.target.closest('[data-go],[data-bris],[data-opt],[data-addchip],[data-rmchip],[data-stop],[data-delsupp],[data-unit],[data-delprod],[data-rmtag],[data-setport],[data-fmethod],[data-addcomp],[data-rmcomp],[data-editrec],[data-imethod],[data-act]') : null;
+  var t = e.target.closest ? e.target.closest('[data-go],[data-bris],[data-opt],[data-addchip],[data-rmchip],[data-stop],[data-delsupp],[data-unit],[data-delprod],[data-rmtag],[data-setport],[data-fmethod],[data-addcomp],[data-rmcomp],[data-editrec],[data-imethod],[data-offpick],[data-act]') : null;
   if(!t) return;
   var d = t.dataset;
   if(d.go) go(d.go);
@@ -3681,6 +3845,10 @@ document.addEventListener('click', function(e){
       STATE.products = STATE.products.filter(function(p){return p.id!==d.delprod;}); renderProducts(); }); }
   else if(d.addcomp) addComponent(d.addcomp);
   else if(d.imethod) setIngMethod(d.imethod);
+  else if(d.offpick){
+    var hit = (window.__offHits||[])[parseInt(d.offpick,10)];
+    if(hit && window.__offPick) window.__offPick(offToProduct({ product: hit }));
+  }
   else if(d.rmcomp){ recipeDraft.components.splice(parseInt(d.rmcomp,10),1); renderRecipe(); }
   else if(d.editrec) editRecipe(d.editrec);
   else if(d.setport){ var sp=d.setport.split('|'); setPortion(sp[0], parseFloat(sp[1])); }
@@ -3694,7 +3862,7 @@ document.addEventListener('click', function(e){
   else if(d.delsupp){ dbDel('supps',d.delsupp,function(){ STATE.supps = STATE.supps.filter(function(s){return s.id!==d.delsupp;}); renderSupps(); }); }
   else if(d.act){
     var m = { saveStool:saveStool, saveMeal:saveMeal, saveMetric:saveMetric, addCustom:addCustomMetric,
-      saveLab:saveLab, addSupp:addSupp, addCustomSupp:addCustomSupp, parseProd:parseProductText, saveProd:saveProduct, lookup:function(){ lookupBarcode(el('prod-barcode').value); }, saveGoals:saveGoals, toggleGoals:toggleGoals, saveRecipe:saveRecipe, toggleIng:function(){toggleIngAdder();},
+      saveLab:saveLab, addSupp:addSupp, addCustomSupp:addCustomSupp, parseProd:parseProductText, saveProd:saveProduct, lookup:lookupBarcode, saveGoals:saveGoals, toggleGoals:toggleGoals, syncKcal:syncKcalGoal, saveRecipe:saveRecipe, toggleIng:function(){toggleIngAdder();},
       addIng:addIngredientFromFields, ingLookup:ingLookupBarcode, saveSettings:saveSettings, export:doExport,
       extract:extractFromPhoto, saveEx:saveExtracted, send:sendChat, resetMask:resetMask, back:function(){ go('hub'); } };
     m[d.act] && m[d.act]();
@@ -3718,16 +3886,14 @@ function boot(){
   });
 
   el('lab-analyte').addEventListener('change', syncUnits);
-  el('meal-input').addEventListener('keydown', function(e){
-    if(e.key==='Enter'){ e.preventDefault(); addChip(this.value); }
-    if(e.key==='Escape'){ el('meal-suggest').innerHTML=''; }
-  });
-  el('meal-input').addEventListener('input', function(){ renderSuggestions(this.value); });
   el('metric-select').addEventListener('change', renderUnitToggle);
   el('chk-blood').addEventListener('change', function(){ stoolDraft.blood=this.checked; checkFlags(); });
   el('chk-pain').addEventListener('change', function(){ stoolDraft.painWakesAtNight=this.checked; checkFlags(); });
   el('photo-input').addEventListener('change', function(){ if(this.files[0]) loadLabPhoto(this.files[0]); });
   el('label-input').addEventListener('change', function(){ if(this.files[0]) readLabelPhoto(this.files[0]); });
+  document.addEventListener('input', function(e){
+    if(e.target.id && e.target.id.indexOf('goal-')===0) renderGoalMath();
+  });
   el('ri-search').addEventListener('input', function(){ renderIngSearch(this.value); });
   el('ri-barcode').addEventListener('keydown', function(e){
     if(e.key==='Enter'){ e.preventDefault(); ingLookupBarcode(); } });
